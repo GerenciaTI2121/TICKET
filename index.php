@@ -20,7 +20,7 @@ if (!isset($_SESSION['usuario'])) {
       --white: #fff;
       --danger: #e74c3c;
       --resolved: #27ae60;
-      --pending: #f39c12; /* Cor para tickets pendentes/em andamento */
+      --pending: #f39c12; /* Cor para tickets abertos/pendentes */
     }
     body {
       font-family: 'Segoe UI', sans-serif;
@@ -102,11 +102,18 @@ if (!isset($_SESSION['usuario'])) {
       padding: 15px;
       margin-bottom: 15px;
       border-radius: 8px;
-      background: var(--bg-light);
       display: flex;
       flex-direction: column;
       gap: 10px;
     }
+    /* NOVOS ESTILOS PARA AS CORES DE FUNDO DOS TICKETS */
+    .ticket-item.status-Aberto-bg {
+      background-color: #ffeccf; /* Laranja/amarelo claro para aberto */
+    }
+    .ticket-item.status-Resolvido-bg {
+      background-color: #e6ffe6; /* Verde claro para resolvido */
+    }
+    /* FIM DOS NOVOS ESTILOS */
     .ticket-item h3 {
       margin: 0 0 5px 0;
       color: var(--main-color);
@@ -218,6 +225,29 @@ if (!isset($_SESSION['usuario'])) {
       border-color: var(--main-color);
       color: var(--white);
     }
+    /* Estilos para a tabela do relatório */
+    #reportContainer table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+        font-size: 0.9em;
+    }
+    #reportContainer th, #reportContainer td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+    }
+    #reportContainer th {
+        background-color: #f2f2f2;
+        font-weight: bold;
+        color: var(--text-color);
+    }
+    #reportContainer tr:nth-child(even) {
+        background-color: #f9f9f9;
+    }
+    #reportContainer tr:hover {
+        background-color: #f1f1f1;
+    }
   </style>
 </head>
 <body>
@@ -260,10 +290,42 @@ if (!isset($_SESSION['usuario'])) {
     <button type="submit">Abrir Ticket</button>
   </form>
 
+  <div style="text-align: center; margin-top: 20px; margin-bottom: 20px;">
+    <button onclick="generateReport()" style="background-color: #3498db; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; display: inline-block; width: auto;">
+      <i class="fa-solid fa-file-alt"></i> Gerar Relatório Geral
+    </button>
+
+    <a href="generate_pdf.php" target="_blank" style="background-color: #e74c3c; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; display: inline-block; width: auto; text-decoration: none; margin-left: 10px;">
+      <i class="fa-solid fa-file-pdf"></i> Baixar Relatório PDF
+    </a>
+  </div>
   <div class="ticket-list">
+    <div style="text-align: center; margin-bottom: 20px;">
+        <button id="filterTodos" onclick="applyFilter('Todos')" style="background-color: #6c757d; color: white; padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer; display: inline-block; width: auto;">
+            Todos
+        </button>
+        <button id="filterAbertos" onclick="applyFilter('Aberto')" style="background-color: #f39c12; color: white; padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer; display: inline-block; width: auto; margin-left: 10px;">
+            Abertos
+        </button>
+        <button id="filterResolvidos" onclick="applyFilter('Resolvido')" style="background-color: #27ae60; color: white; padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer; display: inline-block; width: auto; margin-left: 10px;">
+            Resolvidos
+        </button>
+    </div>
     <h2>Tickets Existentes</h2>
     <div id="ticketsContainer">
       <p style="text-align: center;">Carregando tickets...</p>
+    </div>
+  </div>
+
+  <div class="ticket-list" id="reportContainer" style="display: none;">
+    <h2>Relatório Geral de Tickets</h2>
+    <div id="reportContent">
+      <p style="text-align: center;">Clique no botão acima para gerar o relatório.</p>
+    </div>
+    <div style="text-align: center; margin-top: 20px;">
+        <button onclick="hideReport()" style="background-color: #6c757d; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; display: inline-block; width: auto;">
+            <i class="fa-solid fa-times"></i> Fechar Relatório
+        </button>
     </div>
   </div>
 
@@ -273,17 +335,20 @@ if (!isset($_SESSION['usuario'])) {
     // Lista de técnicos atualizada
     const allTechs = ["Alexandre", "Bruno", "Jhonatan", "Matheus", "Marcio", "Willy"];
     let currentSelectedTechs = [];
+    let currentFilter = 'Todos'; // Estado inicial: mostrar todos os tickets
 
     // Renderiza os checkboxes dos técnicos
     function renderTechCheckboxes() {
       const container = document.getElementById('techsContainer');
       container.innerHTML = '';
       allTechs.forEach(tech => {
-        const checkboxId = `tech_${tech.toLowerCase()}`;
+        const checkboxId = `tech_${tech.toLowerCase().replace(/\s/g, '')}`; // Remove espaços para ID válido
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
         checkbox.id = checkboxId;
         checkbox.value = tech;
+        // Marca o checkbox se o técnico já estiver selecionado em currentSelectedTechs
+        checkbox.checked = currentSelectedTechs.includes(tech);
         checkbox.onchange = (e) => {
           if (e.target.checked) {
             currentSelectedTechs.push(tech);
@@ -304,25 +369,67 @@ if (!isset($_SESSION['usuario'])) {
 
     renderTechCheckboxes(); // Chamada inicial para renderizar os técnicos
 
+    // Função para aplicar o filtro
+    function applyFilter(filterType) {
+        currentFilter = filterType;
+        renderTickets(); // Recarrega os tickets com o novo filtro
+        updateFilterButtonStyles(); // Atualiza o estilo dos botões de filtro
+    }
+
+    // Função para atualizar o estilo dos botões de filtro
+    function updateFilterButtonStyles() {
+        const buttons = document.querySelectorAll('#filterTodos, #filterAbertos, #filterResolvidos');
+        buttons.forEach(button => {
+            button.style.fontWeight = 'normal';
+            button.style.border = 'none';
+            button.style.boxShadow = 'none';
+            // Você pode adicionar ou remover classes aqui se preferir
+        });
+
+        const activeButton = document.getElementById(`filter${currentFilter}`);
+        if (activeButton) {
+            activeButton.style.fontWeight = 'bold';
+            activeButton.style.border = '2px solid white';
+            activeButton.style.boxShadow = '0 0 5px rgba(0,0,0,0.3)';
+        }
+    }
+
+
     async function renderTickets() {
       const ticketsContainer = document.getElementById('ticketsContainer');
       ticketsContainer.innerHTML = '<p style="text-align: center;">Carregando tickets...</p>';
       const res = await fetch('get_tickets.php');
       const tickets = await res.json();
 
+      let filteredTickets = tickets; // Começa com todos os tickets
+      if (currentFilter === 'Aberto') {
+        filteredTickets = tickets.filter(ticket => ticket.status === 'Aberto');
+      } else if (currentFilter === 'Resolvido') {
+        filteredTickets = tickets.filter(ticket => ticket.status === 'Resolvido');
+      }
+
       ticketsContainer.innerHTML = ''; // Limpa o conteúdo antes de renderizar
 
-      if (tickets.length === 0) {
-        ticketsContainer.innerHTML = '<p style="text-align: center;">Nenhum ticket encontrado.</p>';
+      if (filteredTickets.length === 0) {
+        ticketsContainer.innerHTML = '<p style="text-align: center;">Nenhum ticket encontrado com este filtro.</p>';
         return;
       }
 
-      tickets.forEach(ticket => {
+      filteredTickets.forEach(ticket => {
         const div = document.createElement('div');
         div.classList.add('ticket-item');
 
+        // Adiciona a classe de fundo baseada no status
+        let itemBgClass = '';
+        if (ticket.status === 'Aberto') {
+            itemBgClass = 'status-Aberto-bg';
+        } else if (ticket.status === 'Resolvido') {
+            itemBgClass = 'status-Resolvido-bg';
+        }
+        div.classList.add(itemBgClass); // Adiciona a classe de cor de fundo aqui
+
         const createdAt = new Date(ticket.createdAt).toLocaleString('pt-BR');
-        const techsText = ticket.techs.length > 0 ? ticket.techs.join(', ') : 'Nenhum';
+        const techsText = ticket.techs && ticket.techs.length > 0 ? ticket.techs.join(', ') : 'Nenhum';
 
         let statusClass = '';
         if (ticket.status === 'Aberto') {
@@ -331,23 +438,21 @@ if (!isset($_SESSION['usuario'])) {
             statusClass = 'Resolvido';
         }
 
-        // Usando textContent para dados que não contêm HTML do usuário para prevenir XSS
-        // innerHTML usado para descrição com sanitização no backend
         div.innerHTML = `
           <h3>Ticket ID: <span style="color: #666;">${ticket.id.substring(0, 8)}...</span></h3>
           <div class="info-row">
-            <span><strong>Usuário:</strong> ${encodeURIComponent(ticket.usuario)}</span>
-            <span><strong>Setor:</strong> ${encodeURIComponent(ticket.sector)}</span>
-            <span><strong>Tipo:</strong> ${encodeURIComponent(ticket.type)}</span>
-            <span><strong>Prioridade:</strong> ${encodeURIComponent(ticket.priority)}</span>
+            <span><strong>Usuário:</strong> ${ticket.usuario}</span>
+            <span><strong>Setor:</strong> ${ticket.sector}</span>
+            <span><strong>Tipo:</strong> ${ticket.type}</span>
+            <span><strong>Prioridade:</strong> ${ticket.priority}</span>
           </div>
           <p><strong>Descrição:</strong> ${ticket.description}</p>
-          <p><strong>Atribuído a:</strong> ${encodeURIComponent(techsText)}</p>
+          <p><strong>Atribuído a:</strong> ${techsText}</p>
           <p><strong>Criado em:</strong> ${createdAt}</p>
-          <p><strong>Status:</strong> <span class="status ${statusClass}">${encodeURIComponent(ticket.status)}</span></p>
+          <p><strong>Status:</strong> <span class="status ${statusClass}">${ticket.status}</span></p>
           <div class="actions">
-            ${ticket.status === 'Aberto' ? `<button class="resolve-btn" onclick="updateTicketStatus('${ticket.id}', 'Resolvido')"><i class="fa-solid fa-check"></i> Resolver</button>` : ''}
-            <button class="delete-btn" onclick="deleteTicket('${ticket.id}')"><i class="fa-solid fa-trash"></i> Apagar</button>
+            ${ticket.status === 'Aberto' ? `<button class="resolve-btn" onclick="updateTicketStatus('${encodeURIComponent(ticket.id)}', 'Resolvido')"><i class="fa-solid fa-check"></i> Resolver</button>` : ''}
+            <button class="delete-btn" onclick="deleteTicket('${encodeURIComponent(ticket.id)}')"><i class="fa-solid fa-trash"></i> Apagar</button>
           </div>
         `;
         ticketsContainer.appendChild(div);
@@ -382,6 +487,80 @@ if (!isset($_SESSION['usuario'])) {
         alert('Erro ao apagar ticket: ' + (data.message || 'Erro desconhecido.'));
       }
     }
+
+    // Função para Gerar Relatório
+    async function generateReport() {
+      const reportContainer = document.getElementById('reportContainer');
+      const reportContent = document.getElementById('reportContent');
+
+      // Esconde a lista de tickets e mostra o container do relatório
+      document.querySelector('.ticket-list').style.display = 'none'; // Esconde a lista de tickets
+      reportContainer.style.display = 'block'; // Mostra o container do relatório
+
+      reportContent.innerHTML = '<p style="text-align: center;">Gerando relatório...</p>';
+
+      const res = await fetch('get_report.php');
+      const tickets = await res.json();
+
+      // Verifica se houve erro na requisição ou se o usuário não tem permissão
+      if (tickets.success === false && tickets.message) {
+          reportContent.innerHTML = `<p style="text-align: center; color: red;">${tickets.message}</p>`;
+          return;
+      }
+
+      if (tickets.length === 0) {
+        reportContent.innerHTML = '<p style="text-align: center;">Nenhum ticket encontrado para o relatório.</p>';
+        return;
+      }
+
+      // Constrói uma tabela HTML simples para o relatório
+      let tableHtml = `
+        <table border="1">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Usuário</th>
+              <th>Setor</th>
+              <th>Tipo</th>
+              <th>Prioridade</th>
+              <th>Status</th>
+              <th>Atribuído a</th>
+              <th>Criado Em</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+      tickets.forEach(ticket => {
+        const createdAt = new Date(ticket.createdAt).toLocaleString('pt-BR');
+        const techsText = ticket.techs && ticket.techs.length > 0 ? ticket.techs.join(', ') : 'Nenhum';
+        tableHtml += `
+          <tr>
+            <td>${ticket.id.substring(0, 8)}...</td>
+            <td>${ticket.usuario}</td>
+            <td>${ticket.sector}</td>
+            <td>${ticket.type}</td>
+            <td>${ticket.priority}</td>
+            <td>${ticket.status}</td>
+            <td>${techsText}</td>
+            <td>${createdAt}</td>
+          </tr>
+        `;
+      });
+      tableHtml += `
+          </tbody>
+        </table>
+      `;
+      reportContent.innerHTML = tableHtml;
+    }
+
+    // Função para esconder o relatório e mostrar a lista de tickets novamente
+    function hideReport() {
+        document.getElementById('reportContainer').style.display = 'none'; // Esconde o relatório
+        document.querySelector('.ticket-list').style.display = 'block'; // Mostra a lista de tickets
+        renderTickets(); // Recarrega a lista de tickets para garantir que esteja atualizada
+        updateFilterButtonStyles(); // Atualiza o estilo dos botões de filtro
+    }
+
 
     document.getElementById('ticketForm').onsubmit = async e => {
       e.preventDefault();
@@ -436,6 +615,7 @@ if (!isset($_SESSION['usuario'])) {
     };
 
     renderTickets(); // Carrega os tickets quando a página é carregada
+    updateFilterButtonStyles(); // Define o estilo inicial do botão "Todos"
   </script>
 </body>
 </html>
