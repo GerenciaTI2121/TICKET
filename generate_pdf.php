@@ -1,136 +1,133 @@
 <?php
+// ATENÇÃO: As linhas abaixo são para depuração e devem ser REMOVIDAS em ambiente de produção!
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+// FIM DAS LINHAS DE DEPURAÇÃO
+
 session_start();
-
-// Proteger para que apenas o admin possa gerar relatórios em PDF
-if (!isset($_SESSION['usuario']) || $_SESSION['usuario'] !== 'admin') {
-    die('Acesso negado. Apenas administradores podem gerar relatórios em PDF.');
-}
-
-require_once 'vendor/autoload.php'; // Carrega o autoloader do Composer (Dompdf)
+require_once 'vendor/autoload.php';
 
 use Dompdf\Dompdf;
 use Dompdf\Options;
 
-// --- Função para limpar dados (a mesma que você já tem) ---
-function limpar($str) {
-    return htmlspecialchars(strip_tags(trim($str)), ENT_QUOTES, 'UTF-8');
+// Verifica se o usuário está logado
+if (!isset($_SESSION['usuario'])) {
+    // Redireciona para a página de login ou exibe uma mensagem de erro
+    echo "Acesso negado. Por favor, faça login.";
+    exit;
 }
-// --- Fim da função de limpeza ---
+
+// Verifica se o usuário tem permissão para gerar o relatório (apenas 'admin' pode)
+if ($_SESSION['usuario'] !== 'admin') {
+    echo "Você não tem permissão para gerar este relatório.";
+    exit;
+}
+
+header('Content-Type: text/html; charset=UTF-8'); // Garante que o navegador interprete UTF-8
 
 $file = 'tickets.json';
 $tickets = [];
 
 if (file_exists($file)) {
-    $tickets = json_decode(file_get_contents($file), true);
+    $json_content = file_get_contents($file);
+    $tickets = json_decode($json_content, true);
     if (!is_array($tickets)) {
-        $tickets = [];
+        $tickets = []; // Garante que $tickets seja um array em caso de JSON inválido
     }
 }
 
-if (empty($tickets)) {
-    die('Nenhum ticket encontrado para gerar o relatório.');
-}
-
-// Ordenar tickets pelo mais recente primeiro (opcional, igual ao get_report.php)
-usort($tickets, function($a, $b) {
-    return strtotime($b['createdAt']) - strtotime($a['createdAt']);
-});
-
-
-// Gerar o HTML para o PDF
+// Inicia a geração do HTML para o PDF
 $html = '
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Relatório Geral de Tickets</title>
+    <title>Relatório de Tickets de Serviço</title>
     <style>
-        body { font-family: DejaVu Sans, sans-serif; font-size: 10px; margin: 20px; }
+        body { font-family: DejaVu Sans, sans-serif; font-size: 10px; }
         h1 { text-align: center; color: #2ecc71; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; color: #333; font-weight: bold; }
-        tr:nth-child(even) { background-color: #f9f9f9; }
+        th { background-color: #f2f2f2; font-weight: bold; }
         .status-Aberto { color: #f39c12; font-weight: bold; }
         .status-Resolvido { color: #27ae60; font-weight: bold; }
-        .footer { position: fixed; bottom: 0; width: 100%; text-align: center; font-size: 8px; color: #777; }
+        .footer { text-align: center; margin-top: 30px; font-size: 8px; color: #555; }
     </style>
 </head>
 <body>
-    <h1>Relatório Geral de Tickets</h1>
-    <p>Gerado em: ' . date('d/m/Y H:i:s') . '</p>
+    <h1>Relatório de Tickets de Serviço</h1>
     <table>
         <thead>
             <tr>
-                <th>ID</th>
+                <th>ID do Ticket</th>
                 <th>Usuário</th>
                 <th>Setor</th>
                 <th>Tipo</th>
                 <th>Prioridade</th>
                 <th>Status</th>
                 <th>Atribuído a</th>
-                <th>Criado Em</th>
-            </tr>
+                <th>Data de Criação</th>
+                <th>Descrição</th> </tr>
         </thead>
         <tbody>';
 
-foreach ($tickets as $ticket) {
-    // Aplicar a função limpar para garantir que os dados do JSON sejam seguros para HTML no PDF
-    $id = limpar(substr($ticket['id'], 0, 8)) . '...';
-    $usuario_limpo = limpar($ticket['usuario']);
-    $sector_limpo = limpar($ticket['sector']);
-    $type_limpo = limpar($ticket['type']);
-    $priority_limpo = limpar($ticket['priority']);
-    $status_limpo = limpar($ticket['status']);
-    $techs_text = implode(', ', array_map('limpar', $ticket['techs'])); // Limpa cada tech individualmente
-    $createdAt_formatado = date('d/m/Y H:i', strtotime($ticket['createdAt']));
+if (empty($tickets)) {
+    $html .= '<tr><td colspan="9" style="text-align: center;">Nenhum ticket encontrado.</td></tr>'; // Colspan ajustado para 9
+} else {
+    foreach ($tickets as $ticket) {
+        $ticket_id_short = substr($ticket['id'], 0, 8) . '...';
+        $techs_text = !empty($ticket['techs']) ? implode(', ', $ticket['techs']) : 'Nenhum';
+        $created_at = new DateTime($ticket['createdAt']);
 
-    $status_class = '';
-    if ($status_limpo === 'Aberto') {
-        $status_class = 'status-Aberto';
-    } elseif ($status_limpo === 'Resolvido') {
-        $status_class = 'status-Resolvido';
-    }
+        $status_class = '';
+        if ($ticket['status'] === 'Aberto') {
+            $status_class = 'status-Aberto';
+        } elseif ($ticket['status'] === 'Resolvido') {
+            $status_class = 'status-Resolvido';
+        }
 
-    $html .= '
+        $html .= '
             <tr>
-                <td>' . $id . '</td>
-                <td>' . $usuario_limpo . '</td>
-                <td>' . $sector_limpo . '</td>
-                <td>' . $type_limpo . '</td>
-                <td>' . $priority_limpo . '</td>
-                <td><span class="' . $status_class . '">' . $status_limpo . '</span></td>
-                <td>' . $techs_text . '</td>
-                <td>' . $createdAt_formatado . '</td>
-            </tr>';
+                <td>' . htmlspecialchars($ticket_id_short) . '</td>
+                <td>' . htmlspecialchars($ticket['usuario']) . '</td>
+                <td>' . htmlspecialchars($ticket['sector']) . '</td>
+                <td>' . htmlspecialchars($ticket['type']) . '</td>
+                <td>' . htmlspecialchars($ticket['priority']) . '</td>
+                <td><span class="' . $status_class . '">' . htmlspecialchars($ticket['status']) . '</span></td>
+                <td>' . htmlspecialchars($techs_text) . '</td>
+                <td>' . htmlspecialchars($created_at->format('d/m/Y H:i:s')) . '</td>
+                <td>' . htmlspecialchars($ticket['description']) . '</td> </tr>';
+    }
 }
 
 $html .= '
         </tbody>
     </table>
-    <div class="footer">Página <span class="page-number"></span> de <span class="total-pages"></span></div>
+    <div class="footer">
+        Relatório gerado em: ' . date('d/m/Y H:i:s') . '
+    </div>
 </body>
 </html>';
 
-// Configurar Dompdf
+// Configurações do Dompdf
 $options = new Options();
-$options->set('defaultFont', 'DejaVu Sans'); // Define uma fonte que suporte caracteres UTF-8
 $options->set('isHtml5ParserEnabled', true);
-$options->set('isRemoteEnabled', true); // Se tiver imagens externas, etc.
+$options->set('isRemoteEnabled', true); // Permite carregar recursos externos se houver
+$options->set('defaultFont', 'DejaVu Sans'); // Define uma fonte padrão que suporta UTF-8
 
 $dompdf = new Dompdf($options);
-$dompdf->loadHtml($html);
 
-// (Opcional) Configurar o tamanho do papel e a orientação (Portrait = retrato, Landscape = paisagem)
-$dompdf->setPaper('A4', 'landscape'); // A4 paisagem é bom para tabelas largas
+// Carrega o HTML
+$dompdf->loadHtml($html, 'UTF-8'); // Especifica a codificação UTF-8
 
-// Renderizar o HTML como PDF
+// (Opcional) Define o tamanho e a orientação do papel
+$dompdf->setPaper('A4', 'portrait');
+
+// Renderiza o HTML para PDF
 $dompdf->render();
 
-// Adicionar números de página (opcional)
-$dompdf->getCanvas()->page_text(550, 780, "{PAGE_NUM} de {PAGE_COUNT}", null, 8, array(0,0,0));
+// Envia o PDF para o navegador
+$dompdf->stream("relatorio_tickets.pdf", array("Attachment" => true));
 
-
-// Enviar o PDF para o navegador
-$dompdf->stream("relatorio_tickets_" . date('Ymd_His') . ".pdf", array("Attachment" => true)); // "Attachment" => true força o download
-?>
+exit;
