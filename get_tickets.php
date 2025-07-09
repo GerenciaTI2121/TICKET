@@ -1,31 +1,24 @@
 <?php
-session_start();
+require_once 'db_config.php';
+
 header('Content-Type: application/json');
 
-$usuario = $_SESSION['usuario'] ?? '';
+try {
+    $stmt = $pdo->prepare("SELECT * FROM tickets WHERE status IN ('Aberto', 'Resolvido') ORDER BY createdAt DESC");
+    $stmt->execute();
+    $tickets = $stmt->fetchAll();
 
-$file = 'tickets.json';
-if (!file_exists($file)) {
-    echo json_encode([]);
-    exit;
-}
+    // Decodifica a string JSON da coluna 'techs' de volta para array PHP
+    foreach ($tickets as &$ticket) {
+        if (isset($ticket['techs'])) {
+            $ticket['techs'] = json_decode($ticket['techs'], true);
+        }
+    }
+    unset($ticket); // Desreferencia a última variável
 
-$tickets = json_decode(file_get_contents($file), true);
-
-if (!is_array($tickets)) {
-    echo json_encode([]);
-    exit;
-}
-
-// Se for admin, retorna todos
-if ($usuario === 'admin') {
     echo json_encode($tickets);
-    exit;
+} catch (PDOException $e) {
+    error_log("Erro ao obter tickets: " . $e->getMessage());
+    echo json_encode([]); // Retorna array vazio em caso de erro
 }
-
-// Senão, só os tickets do usuário logado
-$tickets_filtrados = array_filter($tickets, function($ticket) use ($usuario) {
-    return isset($ticket['usuario']) && $ticket['usuario'] === $usuario;
-});
-
-echo json_encode(array_values($tickets_filtrados));
+?>

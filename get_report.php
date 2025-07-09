@@ -1,31 +1,34 @@
 <?php
-session_start();
+require_once 'db_config.php';
+
 header('Content-Type: application/json');
 
-// Opcional: Proteger para que apenas o admin possa gerar relatórios
-if (!isset($_SESSION['usuario']) || $_SESSION['usuario'] !== 'admin') {
-    echo json_encode(['success' => false, 'message' => 'Acesso negado.']);
-    exit;
+try {
+    // Contagem de tickets por status
+    $stmtStatus = $pdo->query("SELECT status, COUNT(*) as count FROM tickets GROUP BY status");
+    $statusCounts = $stmtStatus->fetchAll(PDO::FETCH_KEY_PAIR); // Retorna um array associativo [status => count]
+
+    // Contagem de tickets por setor
+    $stmtSector = $pdo->query("SELECT sector, COUNT(*) as count FROM tickets GROUP BY sector");
+    $sectorCounts = $stmtSector->fetchAll(PDO::FETCH_ASSOC);
+
+    // Contagem de tickets por tipo
+    $stmtType = $pdo->query("SELECT type, COUNT(*) as count FROM tickets GROUP BY type");
+    $typeCounts = $stmtType->fetchAll(PDO::FETCH_ASSOC);
+
+    // Contagem de tickets por prioridade
+    $stmtPriority = $pdo->query("SELECT priority, COUNT(*) as count FROM tickets GROUP BY priority");
+    $priorityCounts = $stmtPriority->fetchAll(PDO::FETCH_ASSOC);
+
+    echo json_encode([
+        'status' => $statusCounts,
+        'sector' => $sectorCounts,
+        'type' => $typeCounts,
+        'priority' => $priorityCounts
+    ]);
+
+} catch (PDOException $e) {
+    error_log("Erro ao gerar relatório: " . $e->getMessage());
+    echo json_encode(['error' => 'Erro ao gerar relatório.']);
 }
-
-$file = 'tickets.json';
-if (!file_exists($file)) {
-    echo json_encode([]);
-    exit;
-}
-
-$tickets = json_decode(file_get_contents($file), true);
-
-if (!is_array($tickets)) {
-    echo json_encode([]);
-    exit;
-}
-
-// Opcional: Adicionar lógica para filtrar os tickets se houver parâmetros na URL
-// Ex: $status_filtro = $_GET['status'] ?? null;
-// Ex: $tickets_filtrados = array_filter($tickets, function($ticket) use ($status_filtro) {
-//     return $status_filtro ? ($ticket['status'] === $status_filtro) : true;
-// });
-
-echo json_encode(array_values($tickets)); // Retorna todos os tickets
 ?>

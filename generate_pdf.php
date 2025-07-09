@@ -1,133 +1,133 @@
 <?php
-// ATENÇÃO: As linhas abaixo são para depuração e devem ser REMOVIDAS em ambiente de produção!
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-// FIM DAS LINHAS DE DEPURAÇÃO
+// generate_pdf.php com DOMPDF
+require_once 'db_config.php';
 
-session_start();
-require_once 'vendor/autoload.php';
+// Verifique e ajuste o caminho para o autoload do DOMPDF
+// Se você instalou via Composer, o caminho geralmente é 'vendor/autoload.php'
+require_once 'vendor/autoload.php'; // <--- AJUSTE ESTE CAMINHO SE NECESSÁRIO
 
 use Dompdf\Dompdf;
 use Dompdf\Options;
 
-// Verifica se o usuário está logado
-if (!isset($_SESSION['usuario'])) {
-    // Redireciona para a página de login ou exibe uma mensagem de erro
-    echo "Acesso negado. Por favor, faça login.";
-    exit;
-}
+// 1. Obter os dados dos tickets do MySQL
+try {
+    $stmt = $pdo->prepare("SELECT * FROM tickets ORDER BY createdAt DESC");
+    $stmt->execute();
+    $tickets = $stmt->fetchAll();
 
-// Verifica se o usuário tem permissão para gerar o relatório (apenas 'admin' pode)
-if ($_SESSION['usuario'] !== 'admin') {
-    echo "Você não tem permissão para gerar este relatório.";
-    exit;
-}
-
-header('Content-Type: text/html; charset=UTF-8'); // Garante que o navegador interprete UTF-8
-
-$file = 'tickets.json';
-$tickets = [];
-
-if (file_exists($file)) {
-    $json_content = file_get_contents($file);
-    $tickets = json_decode($json_content, true);
-    if (!is_array($tickets)) {
-        $tickets = []; // Garante que $tickets seja um array em caso de JSON inválido
+    // Decodifica a string JSON da coluna 'techs' de volta para array PHP
+    foreach ($tickets as &$ticket) {
+        if (isset($ticket['techs'])) {
+            $ticket['techs'] = json_decode($ticket['techs'], true);
+        }
     }
+    unset($ticket); // Desreferencia a última variável
+
+} catch (PDOException $e) {
+    error_log("Erro ao obter tickets para PDF: " . $e->getMessage());
+    die('Erro ao carregar dados para o relatório PDF.');
 }
 
-// Inicia a geração do HTML para o PDF
-$html = '
-<!DOCTYPE html>
-<html lang="pt-BR">
+// 2. Construir o conteúdo HTML para o PDF
+$html = '<!DOCTYPE html>
+<html>
 <head>
     <meta charset="UTF-8">
-    <title>Relatório de Tickets de Serviço</title>
+    <title>Relatório de Tickets</title>
     <style>
-        body { font-family: DejaVu Sans, sans-serif; font-size: 10px; }
-        h1 { text-align: center; color: #2ecc71; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; font-weight: bold; }
-        .status-Aberto { color: #f39c12; font-weight: bold; }
-        .status-Resolvido { color: #27ae60; font-weight: bold; }
-        .footer { text-align: center; margin-top: 30px; font-size: 8px; color: #555; }
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        h1 { text-align: center; color: #333; }
+        .ticket-card {
+            border: 1px solid #ccc;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+        }
+        .ticket-card h2 {
+            margin-top: 0;
+            color: #0056b3;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+        .ticket-card p {
+            margin: 5px 0;
+            line-height: 1.5;
+        }
+        .ticket-card p strong {
+            color: #555;
+        }
+        .status-aberto { color: #d9534f; } /* Vermelho */
+        .status-resolvido { color: #5cb85c; } /* Verde */
+        .status-arquivado { color: #5bc0de; } /* Azul claro */
+        .priority-alta { color: #d9534f; font-weight: bold; }
+        .priority-media { color: #f0ad4e; }
+        .priority-baixa { color: #5cb85c; }
     </style>
 </head>
 <body>
-    <h1>Relatório de Tickets de Serviço</h1>
-    <table>
-        <thead>
-            <tr>
-                <th>ID do Ticket</th>
-                <th>Usuário</th>
-                <th>Setor</th>
-                <th>Tipo</th>
-                <th>Prioridade</th>
-                <th>Status</th>
-                <th>Atribuído a</th>
-                <th>Data de Criação</th>
-                <th>Descrição</th> </tr>
-        </thead>
-        <tbody>';
+    <h1>Relatório de Tickets</h1>';
 
 if (empty($tickets)) {
-    $html .= '<tr><td colspan="9" style="text-align: center;">Nenhum ticket encontrado.</td></tr>'; // Colspan ajustado para 9
+    $html .= '<p style="text-align: center;">Nenhum ticket encontrado para gerar o relatório.</p>';
 } else {
     foreach ($tickets as $ticket) {
-        $ticket_id_short = substr($ticket['id'], 0, 8) . '...';
-        $techs_text = !empty($ticket['techs']) ? implode(', ', $ticket['techs']) : 'Nenhum';
-        $created_at = new DateTime($ticket['createdAt']);
-
-        $status_class = '';
-        if ($ticket['status'] === 'Aberto') {
-            $status_class = 'status-Aberto';
-        } elseif ($ticket['status'] === 'Resolvido') {
-            $status_class = 'status-Resolvido';
+        $html .= '<div class="ticket-card">';
+        $html .= '<h2>Ticket ID: ' . htmlspecialchars($ticket['id']) . '</h2>';
+        $html .= '<p><strong>Usuário:</strong> ' . htmlspecialchars($ticket['usuario']) . '</p>';
+        $html .= '<p><strong>Setor:</strong> ' . htmlspecialchars($ticket['sector']) . '</p>';
+        $html .= '<p><strong>Tipo:</strong> ' . htmlspecialchars($ticket['type']) . '</p>';
+        
+        // Adiciona classe CSS para prioridade
+        $priorityClass = '';
+        switch (strtolower($ticket['priority'])) {
+            case 'alta': $priorityClass = 'priority-alta'; break;
+            case 'media': $priorityClass = 'priority-media'; break;
+            case 'baixa': $priorityClass = 'priority-baixa'; break;
         }
-
-        $html .= '
-            <tr>
-                <td>' . htmlspecialchars($ticket_id_short) . '</td>
-                <td>' . htmlspecialchars($ticket['usuario']) . '</td>
-                <td>' . htmlspecialchars($ticket['sector']) . '</td>
-                <td>' . htmlspecialchars($ticket['type']) . '</td>
-                <td>' . htmlspecialchars($ticket['priority']) . '</td>
-                <td><span class="' . $status_class . '">' . htmlspecialchars($ticket['status']) . '</span></td>
-                <td>' . htmlspecialchars($techs_text) . '</td>
-                <td>' . htmlspecialchars($created_at->format('d/m/Y H:i:s')) . '</td>
-                <td>' . htmlspecialchars($ticket['description']) . '</td> </tr>';
+        $html .= '<p><strong>Prioridade:</strong> <span class="' . $priorityClass . '">' . htmlspecialchars($ticket['priority']) . '</span></p>';
+        
+        // Adiciona classe CSS para status
+        $statusClass = '';
+        switch (strtolower($ticket['status'])) {
+            case 'aberto': $statusClass = 'status-aberto'; break;
+            case 'resolvido': $statusClass = 'status-resolvido'; break;
+            case 'arquivado': $statusClass = 'status-arquivado'; break;
+        }
+        $html .= '<p><strong>Status:</strong> <span class="' . $statusClass . '">' . htmlspecialchars($ticket['status']) . '</span></p>';
+        
+        $html .= '<p><strong>Descrição:</strong> ' . nl2br(htmlspecialchars($ticket['description'])) . '</p>';
+        
+        $techsList = 'N/A';
+        if (!empty($ticket['techs'])) {
+            $techsList = implode(', ', array_map('htmlspecialchars', $ticket['techs']));
+        }
+        $html .= '<p><strong>Técnicos:</strong> ' . $techsList . '</p>';
+        
+        $html .= '<p><strong>Criado em:</strong> ' . htmlspecialchars($ticket['createdAt']) . '</p>';
+        $html .= '<p><strong>Última Atualização:</strong> ' . htmlspecialchars($ticket['updatedAt']) . '</p>';
+        $html .= '</div>';
     }
 }
 
-$html .= '
-        </tbody>
-    </table>
-    <div class="footer">
-        Relatório gerado em: ' . date('d/m/Y H:i:s') . '
-    </div>
-</body>
+$html .= '</body>
 </html>';
 
-// Configurações do Dompdf
+// 3. Configurar e gerar o PDF com DOMPDF
 $options = new Options();
-$options->set('isHtml5ParserEnabled', true);
-$options->set('isRemoteEnabled', true); // Permite carregar recursos externos se houver
-$options->set('defaultFont', 'DejaVu Sans'); // Define uma fonte padrão que suporta UTF-8
+$options->set('defaultFont', 'Arial'); // Define uma fonte padrão para evitar problemas
+$options->set('isHtml5ParserEnabled', true); // Habilita o parser HTML5
+$options->set('isRemoteEnabled', false); // Desabilita o carregamento de recursos externos (imagens, CSS) via URL, por segurança e performance
 
 $dompdf = new Dompdf($options);
+$dompdf->loadHtml($html);
 
-// Carrega o HTML
-$dompdf->loadHtml($html, 'UTF-8'); // Especifica a codificação UTF-8
-
-// (Opcional) Define o tamanho e a orientação do papel
+// (Opcional) Configurar o tamanho e a orientação do papel
 $dompdf->setPaper('A4', 'portrait');
 
-// Renderiza o HTML para PDF
+// Renderizar o HTML para PDF
 $dompdf->render();
 
-// Envia o PDF para o navegador
-$dompdf->stream("relatorio_tickets.pdf", array("Attachment" => true));
-
-exit;
+// Enviar o PDF para o navegador
+$dompdf->stream("relatorio_tickets.pdf", ["Attachment" => false]); // "Attachment" => false para exibir no navegador
+?>

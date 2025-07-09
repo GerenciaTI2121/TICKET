@@ -8,11 +8,11 @@ if (!isset($_SESSION['usuario'])) {
 
 $username = $_SESSION['usuario'];
 
-// Caminho para o arquivo JSON de tickets
+// Caminho para o arquivo JSON de tickets (já não é mais usado, mas mantido para compatibilidade se houver outras referências)
 $file = 'tickets.json';
 $tickets = [];
 
-// Carrega tickets do arquivo JSON
+// Carrega tickets do arquivo JSON (parte legada, agora os tickets vêm do DB)
 if (file_exists($file)) {
     $json_content = file_get_contents($file);
     $tickets = json_decode($json_content, true);
@@ -28,93 +28,248 @@ if (file_exists($file)) {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Gestão de Tickets de Serviço</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Variáveis de cor globais */
+        /* Variáveis de cor globais - NOVA PALETA PRETO E VERDE */
         :root {
-            --main-color: #2ecc71;
-            --text-color: #333;
-            --bg-light: #f9f9f9;
-            --white: #fff;
-            --danger: #e74c3c;
-            --resolved: #27ae60;
-            --pending: #f39c12; /* Cor para tickets abertos/pendentes */
-            --info-color: #3498db; /* Cor para botões de informação/relatório */
-            --secondary-button-color: #6c757d; /* Cor para botões secundários */
-            --border-color: #ddd; /* Cor de borda para itens de ticket */
-            --shadow-color: rgba(0,0,0,0.1);
-            --archived-bg: #f0f8ff; /* Cor de fundo para tickets arquivados */
-            --archived-border: #a0c4ff;
-            /* Removidas variáveis específicas de dashboard */
+            --primary-green: #2ecc71; /* Verde principal para botões, destaques */
+            --dark-background: #1a1a1a; /* Fundo escuro */
+            --dark-text: #e0e0e0; /* Texto claro para fundo escuro */
+            --light-text: #333; /* Texto escuro para fundo claro */
+            --card-background: #ffffff; /* Fundo dos cards de ticket */
+            --border-light: #e0e0e0; /* Borda clara */
+            --shadow-color: rgba(0, 0, 0, 0.1); /* Sombra suave */
+            --danger-red: #e74c3c; /* Vermelho para ações de perigo */
+            --info-blue: #3498db; /* Azul para informações */
+            --status-resolved: #28a745; /* Verde para status resolvido */
+            --status-open: #ffc107; /* Amarelo para status aberto/pendente */
+            --secondary-button-bg: #6c757d; /* Cinza para botões secundários */
+            --archive-bg: #f8f9fa; /* Fundo para seções de arquivo */
+            --header-bg: #2b2b2b; /* Fundo do cabeçalho */
+            --header-text: #ffffff; /* Cor do texto do cabeçalho */
+            --input-border: #cccccc;
+            --input-focus-border: var(--primary-green);
         }
 
         /* Estilos base */
         body {
-            font-family: 'Segoe UI', sans-serif;
+            font-family: 'Poppins', sans-serif;
             margin: 0;
-            padding: 20px;
-            background: var(--bg-light);
-            color: var(--text-color);
+            padding: 0;
+            background: var(--dark-background);
+            color: var(--light-text); /* Default para elementos com fundo claro */
             display: flex;
             flex-direction: column;
-            min-height: 100vh; /* Garante que o body ocupe a altura total da viewport */
+            min-height: 100vh;
         }
-        h1, h2 {
+
+        /* Layout Principal */
+        .main-wrapper {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* Header / Navbar */
+        header {
+            background-color: var(--header-bg);
+            color: var(--header-text);
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 1.8em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--primary-green);
+        }
+        header h1 i {
+            color: var(--header-text);
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .user-info span {
+            font-size: 1em;
+            font-weight: 500;
+            color: var(--header-text);
+        }
+        .user-info .action-button {
+            background-color: var(--danger-red);
+            padding: 8px 15px;
+            border-radius: 6px;
+            font-size: 0.9em;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            text-decoration: none;
+            color: var(--header-text);
+            transition: background-color 0.2s ease;
+        }
+        .user-info .action-button:hover {
+            background-color: #c0392b;
+        }
+
+        /* Conteúdo principal */
+        main {
+            flex-grow: 1; /* Permite que o conteúdo ocupe o espaço restante */
+            padding: 30px 20px;
+            max-width: 1200px; /* Largura máxima para o conteúdo central */
+            margin: 0 auto; /* Centraliza o conteúdo */
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        h2 {
             text-align: center;
-            color: var(--main-color);
-            margin-bottom: 20px;
+            color: var(--primary-green);
+            margin-bottom: 30px;
+            font-weight: 600;
+            font-size: 1.8em;
         }
-        form {
-            max-width: 600px;
-            margin: 20px auto;
-            background: var(--white);
-            padding: 25px;
+
+        /* Botões de Ação Principal (abas de navegação) */
+        .main-action-buttons {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 30px;
+            background-color: var(--card-background);
+            padding: 15px;
             border-radius: 10px;
             box-shadow: 0 2px 8px var(--shadow-color);
         }
+        .main-action-buttons .action-button {
+            background-color: var(--secondary-button-bg);
+            color: var(--header-text);
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 1em;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+        }
+        .main-action-buttons .action-button:hover {
+            background-color: #5a6268;
+            transform: translateY(-2px);
+        }
+        .main-action-buttons .action-button.active {
+            background-color: var(--primary-green);
+            box-shadow: 0 4px 8px rgba(46, 204, 113, 0.3);
+            color: var(--header-text); /* Garante que o texto fique branco */
+        }
+        .main-action-buttons .action-button.active:hover {
+            background-color: #27ae60;
+            transform: translateY(0);
+        }
+        .main-action-buttons .action-button.danger {
+            background-color: var(--danger-red);
+        }
+        .main-action-buttons .action-button.danger:hover {
+            background-color: #c0392b;
+        }
+        .main-action-buttons .action-button.info-color {
+            background-color: var(--info-blue);
+        }
+        .main-action-buttons .action-button.info-color:hover {
+            background-color: #218cda;
+        }
+
+        /* Mensagens */
+        #message {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: 600;
+            display: none; /* Controlado por JS */
+            color: var(--header-text);
+            background-color: var(--primary-green);
+        }
+
+        /* Formulário */
+        form {
+            max-width: 700px;
+            margin: 20px auto;
+            background: var(--card-background);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px var(--shadow-color);
+            color: var(--light-text);
+        }
         .form-group {
-            margin-bottom: 15px;
+            margin-bottom: 20px;
         }
         label {
             display: block;
             margin-bottom: 8px;
-            font-weight: bold;
-            color: var(--text-color);
+            font-weight: 500;
+            color: var(--light-text);
         }
         input[type="text"], textarea, select {
-            width: calc(100% - 22px);
-            padding: 10px;
-            margin-bottom: 5px; /* Ajuste para espaçamento dentro do form-group */
-            border: 1px solid #ccc;
-            border-radius: 5px;
+            width: calc(100% - 24px);
+            padding: 12px;
+            border: 1px solid var(--input-border);
+            border-radius: 8px;
             font-size: 1em;
             box-sizing: border-box;
-            color: var(--text-color);
-            background-color: var(--white);
+            color: var(--light-text);
+            background-color: var(--card-background);
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        input[type="text"]:focus, textarea:focus, select:focus {
+            border-color: var(--input-focus-border);
+            box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.2);
+            outline: none;
         }
         textarea {
             resize: vertical;
-            min-height: 80px;
+            min-height: 100px;
         }
         button[type="submit"] {
-            background: var(--main-color);
-            color: var(--white);
-            padding: 12px 20px;
+            background: var(--primary-green);
+            color: var(--header-text);
+            padding: 12px 25px;
             border: none;
-            border-radius: 5px;
+            border-radius: 8px;
             cursor: pointer;
             font-size: 1.1em;
-            transition: background 0.3s ease;
+            font-weight: 600;
+            transition: background 0.2s ease, transform 0.1s ease;
             width: 100%;
             box-sizing: border-box;
             margin-top: 15px;
         }
         button[type="submit"]:hover {
             background: #27ae60;
+            transform: translateY(-2px);
         }
         .error-messages {
-            color: var(--danger);
-            margin-bottom: 15px;
+            color: var(--danger-red);
+            margin-top: 15px;
             font-size: 0.9em;
+            background-color: rgba(231, 76, 60, 0.1);
+            border: 1px solid var(--danger-red);
+            border-radius: 8px;
+            padding: 10px;
         }
         .error-messages ul {
             list-style: none;
@@ -124,316 +279,225 @@ if (file_exists($file)) {
         .error-messages li {
             margin-bottom: 5px;
         }
+
+        /* Lista de Tickets */
         .ticket-list {
-            max-width: 800px;
+            max-width: 1000px;
             margin: 30px auto;
-            background: var(--white);
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 8px var(--shadow-color);
+            display: grid; /* Usando grid para os cards */
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); /* Colunas adaptáveis */
+            gap: 25px; /* Espaçamento entre os cards */
+            padding: 0 10px;
         }
 
-        /* ESTILOS PARA O LAYOUT RETANGULAR DEITADO DO TICKET */
+        /* Estilo do Card de Ticket */
         .ticket-item {
-            border: 1px solid var(--border-color);
-            padding: 15px;
-            margin-bottom: 15px;
-            border-radius: 8px;
+            background: var(--card-background);
+            border: 1px solid var(--border-light);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px var(--shadow-color);
             display: flex;
-            flex-direction: column; /* Conteúdo principal em coluna */
-            gap: 10px;
+            flex-direction: column;
+            gap: 15px;
+            transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease; /* Adicionado transição para borda/sombra */
+            color: var(--light-text);
         }
-        /* Estilo específico para tickets arquivados */
-        .ticket-item.archived-item {
-            background-color: var(--archived-bg);
-            border-color: var(--archived-border);
-        }
-
-        /* Cores de fundo dos tickets */
-        .ticket-item.status-Aberto-bg {
-            background-color: #ffeccf; /* Laranja/amarelo claro para aberto */
-        }
-        .ticket-item.status-Resolvido-bg {
-            background-color: #e6ffe6; /* Verde claro para resolvido */
+        .ticket-item:hover {
+            transform: translateY(-5px);
         }
 
+        /* NOVOS ESTILOS PARA CORES DO TICKET */
+        .ticket-item.status-open-ticket {
+            border-left: 8px solid var(--status-open);
+            box-shadow: 0 4px 12px rgba(255, 193, 7, 0.2); /* Sombra mais amarelada */
+        }
+
+        .ticket-item.status-resolved-ticket {
+            border-left: 8px solid var(--status-resolved);
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.2); /* Sombra mais esverdeada */
+        }
+        /* FIM NOVOS ESTILOS */
+
+        /* Status Badges */
         .ticket-item h3 {
             margin: 0;
-            color: var(--main-color);
-            font-size: 1.2em;
-            display: flex; /* Para alinhar o ID e o status */
+            font-size: 1.25em;
+            display: flex;
             justify-content: space-between;
             align-items: center;
+            font-weight: 600;
+            color: var(--light-text); /* Cor do texto do título do ticket */
         }
-        .ticket-item h3 .status { /* Estilo para o status dentro do H3 */
-            font-weight: bold;
-            padding: 5px 10px;
-            border-radius: 5px;
-            font-size: 0.9em;
-            color: var(--white);
+        .ticket-item h3 .status {
+            font-weight: 700;
+            padding: 6px 12px;
+            border-radius: 20px; /* Pills/badges */
+            font-size: 0.85em;
+            color: var(--header-text);
+            text-transform: uppercase;
         }
         .ticket-item h3 .status.Aberto {
-            background: var(--pending);
+            background: var(--status-open);
         }
         .ticket-item h3 .status.Resolvido {
-            background: var(--resolved);
+            background: var(--status-resolved);
         }
 
+        /* Informações do Ticket (Grid Interno) */
+        .info-grid-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr; /* Duas colunas */
+            gap: 10px 20px; /* Espaçamento entre linhas e colunas */
+            padding-bottom: 15px;
+            border-bottom: 1px dashed var(--border-light);
+        }
+        .info-grid-details div {
+            font-size: 0.9em;
+        }
+        .info-grid-details div strong {
+            display: block; /* Label em cima do valor */
+            color: #777; /* Cor do label */
+            font-weight: 500;
+            margin-bottom: 3px;
+        }
+        /* Ajuste para que o valor não seja bold se não for necessário */
+        .info-grid-details div span {
+            font-weight: 400;
+        }
+
+        .description-box {
+            background-color: #f9f9f9;
+            border: 1px solid var(--border-light);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            color: #555;
+            flex-grow: 1; /* Ocupa o espaço disponível */
+        }
+        .description-box strong {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--light-text);
+            font-size: 1em;
+            font-weight: 600;
+        }
+        .description-box p {
+            margin: 0;
+            line-height: 1.6;
+        }
+
+        /* Data de Criação/Atualização e Técnicos */
         .ticket-item p {
             margin: 0;
-            line-height: 1.5;
+            font-size: 0.85em;
+            color: #777;
         }
-        
+        .ticket-item p strong {
+            color: #555;
+            font-weight: 600;
+        }
+
+        /* Botões de Ação do Ticket */
         .ticket-item .actions {
             display: flex;
+            flex-wrap: wrap;
             gap: 10px;
-            justify-content: flex-end;
-            flex-wrap: wrap; /* Para que os botões quebrem linha se necessário */
+            justify-content: flex-end; /* Alinha à direita */
+            padding-top: 10px;
+            border-top: 1px dashed var(--border-light);
         }
         .ticket-item .actions button {
-            width: auto;
-            padding: 8px 15px;
+            flex: 1 1 auto; /* Permite que os botões cresçam/diminuam */
+            min-width: 90px; /* Largura mínima para os botões */
+            padding: 10px 15px;
             font-size: 0.9em;
-            margin-top: 0; /* Override default button margin-top */
-            background-color: var(--main-color); /* Default para botões de ação do ticket */
-            color: var(--white);
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background 0.3s ease;
-        }
-        .ticket-item .actions button:hover {
-            opacity: 0.9;
+            border-radius: 8px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
         }
         .ticket-item .actions .resolve-btn {
-            background: var(--resolved);
+            background: var(--status-resolved);
+            color: var(--header-text);
         }
         .ticket-item .actions .resolve-btn:hover {
-            background: #218c53;
+            background: #218838;
+        }
+        .ticket-item .actions .edit-btn {
+            background: var(--info-blue);
+            color: var(--header-text);
+        }
+        .ticket-item .actions .edit-btn:hover {
+            background: #218cda;
         }
         .ticket-item .actions .delete-btn {
-            background: var(--danger);
+            background: var(--danger-red);
+            color: var(--header-text);
         }
         .ticket-item .actions .delete-btn:hover {
             background: #c0392b;
         }
 
-        /* Grid para as informações detalhadas dentro do ticket-item (HORIZONTAL) */
-        .info-grid-details {
-            display: flex; /* Alterado para flexbox */
-            flex-wrap: wrap; /* Permite que os itens quebrem linha se não houver espaço */
-            gap: 8px 20px; /* Espaçamento entre itens (linha e coluna) */
-            margin-bottom: 5px;
-            border: 1px solid var(--border-color);
-            padding: 10px;
-            border-radius: 5px;
-            background-color: #fcfcfc;
-        }
-        .info-grid-details div {
-            white-space: nowrap; /* Impede que o texto quebre dentro do div */
-            /* A largura mínima aqui ajuda a controlar quantos itens ficam por linha */
-            flex: 1 1 auto; /* Permite que o item cresça, diminua e tenha uma base flexível */
-            min-width: 150px; /* Largura mínima para cada item. Ajuste se necessário */
-            padding: 2px 0;
-        }
-        .info-grid-details div strong {
-            color: #555;
-            display: inline; /* Altera para inline, para que o valor fique ao lado */
-            margin-right: 5px; /* Espaço entre o label e o valor */
-            font-size: 0.85em;
-        }
-        /* Ajuste para remover o "display: block" apenas para o strong */
-        .info-grid-details div strong + span { /* Para o valor que vem depois do strong */
-            display: inline;
-        }
-
-        .description-box {
-            border: 1px solid var(--border-color);
-            padding: 10px;
-            border-radius: 5px;
-            background-color: #fcfcfc;
-            margin-top: 5px;
-        }
-        .description-box strong {
-            display: block;
-            margin-bottom: 5px;
-            color: #555;
-            font-size: 0.9em;
-        }
-
-        .tech-selection {
-            margin-bottom: 15px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            padding: 10px;
-            background-color: #f0f0f0;
-        }
-        .tech-selection label {
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-        .tech-selection div {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        .tech-selection input[type="checkbox"] {
-            display: none;
-        }
-        .tech-selection label.checkbox-label {
-            background-color: #e0e0e0;
-            border: 1px solid #bbb;
-            padding: 8px 12px;
-            border-radius: 20px;
-            cursor: pointer;
-            transition: background-color 0.3s, border-color 0.3s;
-            font-size: 0.9em;
-            color: #555;
-        }
-        .tech-selection input[type="checkbox"]:checked + label.checkbox-label {
-            background-color: var(--main-color);
-            border-color: var(--main-color);
-            color: var(--white);
-        }
-        /* Estilos para a tabela do relatório */
-        #reportContainer table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-            font-size: 0.9em;
-        }
-        #reportContainer th, #reportContainer td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-            color: var(--text-color);
-        }
-        #reportContainer th {
-            background-color: #f2f2f2;
-            font-weight: bold;
-            color: var(--text-color);
-        }
-        #reportContainer tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
-        #reportContainer tr:hover {
-            background-color: #f1f1f1;
-        }
-
-        /* CONTAINER DOS BOTÕES DE AÇÃO GLOBAL (RELATÓRIO, PDF, ARQUIVAR) */
-        .main-action-buttons {
-            max-width: 800px;
-            margin: 20px auto 30px auto;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 10px;
-            padding: 0 10px;
-            box-sizing: border-box;
-        }
-        .main-action-buttons .action-button {
-            background-color: var(--info-color);
-            color: var(--white);
-            padding: 12px 15px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            text-decoration: none;
-            font-size: 1em;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            transition: background-color 0.3s ease;
-            width: 100%;
-            box-sizing: border-box;
-        }
-        .main-action-buttons .action-button:hover {
-            opacity: 0.9;
-        }
-        .main-action-buttons .action-button.logout-btn {
-            background-color: var(--danger);
-        }
-        .main-action-buttons .action-button.archive-all-btn {
-            background-color: #a04000;
-        }
-        .main-action-buttons .action-button.archive-all-btn:hover {
-            background-color: #8a3700;
-        }
-        .main-action-buttons .action-button.view-archive-btn {
-            background-color: #3f51b5;
-        }
-        .main-action-buttons .action-button.view-archive-btn:hover {
-            background-color: #303f9f;
-        }
-        .main-action-buttons .action-button.active { /* Estilo para o botão ativo da aba */
-            outline: 2px solid var(--main-color);
-            box-shadow: 0 0 8px rgba(0,0,0,0.3);
-            font-weight: bold;
-        }
-
-
-        /* Estilos para os botões de filtro */
+        /* Filtros de Tickets */
         .filter-buttons {
-            text-align: center;
-            margin-bottom: 20px;
             display: flex;
             justify-content: center;
             flex-wrap: wrap;
             gap: 10px;
+            margin-bottom: 30px;
         }
         .filter-buttons .filter-button {
-            background-color: var(--secondary-button-color);
-            color: var(--white);
-            padding: 8px 15px;
+            background-color: var(--secondary-button-bg);
+            color: var(--header-text);
+            padding: 10px 18px;
             border: none;
-            border-radius: 5px;
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 0.9em;
+            font-size: 0.95em;
+            font-weight: 500;
             display: inline-flex;
             align-items: center;
-            gap: 5px;
-            transition: background-color 0.3s ease, font-weight 0.2s ease, box-shadow 0.2s ease;
+            gap: 8px;
+            transition: background-color 0.2s ease, transform 0.1s ease;
         }
         .filter-buttons .filter-button:hover {
-            opacity: 0.9;
+            background-color: #5a6268;
+            transform: translateY(-2px);
         }
         .filter-buttons .filter-button.active {
-            font-weight: bold;
-            background-color: var(--main-color);
-            box-shadow: 0 0 5px rgba(0,0,0,0.3);
+            background-color: var(--primary-green);
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(46, 204, 113, 0.3);
+            transform: translateY(0);
         }
-        /* Cores específicas para filtros ativos */
-        #filterAberto.active { background-color: var(--pending); }
-        #filterResolvido.active { background-color: var(--resolved); }
+        #filterAberto.active { background-color: var(--status-open); }
+        #filterResolvido.active { background-color: var(--status-resolved); }
 
-        /* Botão Sair - Mantido no topo para consistência */
-        .logout-button-container {
-            display: flex;
-            justify-content: flex-end;
-            margin-bottom: 20px;
-            width: 100%;
-            box-sizing: border-box;
-            padding-right: 20px;
+        /* Estilos específicos para tickets arquivados */
+        .ticket-item.archived-item {
+            background-color: var(--archive-bg);
+            border-color: #d1d9e6; /* Uma cor de borda diferente para arquivados */
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            border-left: none; /* Garante que tickets arquivados não tenham a borda de status ativa */
         }
-        .logout-button-container .action-button {
-            background-color: var(--danger);
-            color: var(--white);
-            padding: 10px 15px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            text-decoration: none;
-            font-size: 0.9em;
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            transition: background-color 0.3s ease;
+        .ticket-item.archived-item h3 {
+            color: #666;
         }
-        .logout-button-container .action-button:hover {
-            opacity: 0.9;
+        .ticket-item.archived-item .description-box {
+            background-color: #f0f0f0;
+            border-color: #d1d1d1;
         }
-
-        /* Estilos para o filtro de mês/ano dos arquivados */
+        .ticket-item.archived-item .info-grid-details {
+            border-color: #d1d1d1;
+        }
+        .ticket-item.archived-item .actions {
+            display: none; /* Não mostra ações para tickets arquivados */
+        }
+        /* Filtro de arquivo */
         .archive-filter-controls {
             display: flex;
             justify-content: center;
@@ -441,531 +505,794 @@ if (file_exists($file)) {
             gap: 15px;
             margin-bottom: 20px;
             flex-wrap: wrap;
+            color: var(--header-text); /* Texto do filtro em branco/claro */
         }
         .archive-filter-controls label {
-            margin: 0;
-            font-weight: bold;
+            font-weight: 500;
         }
         .archive-filter-controls select {
+            background-color: var(--card-background);
+            color: var(--light-text);
+            border: 1px solid var(--border-light);
             padding: 8px 12px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
+            border-radius: 8px;
             font-size: 1em;
             cursor: pointer;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .archive-filter-controls select:focus {
+            border-color: var(--primary-green);
+            box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.2);
+            outline: none;
         }
 
-        /* REMOVIDOS OS ESTILOS DO DASHBOARD AQUI */
+        /* Tech Selection (checkboxes personalizados) */
+        .tech-selection {
+            background-color: #f0f0f0;
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .tech-selection label {
+            font-weight: 600;
+            color: var(--light-text);
+            margin-bottom: 10px;
+        }
+        .tech-selection > div { /* Container dos checkboxes */
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .tech-selection input[type="checkbox"] {
+            display: none; /* Esconde o checkbox nativo */
+        }
+        .tech-selection label.checkbox-label {
+            background-color: #e9ecef;
+            border: 1px solid #ced4da;
+            padding: 8px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+            font-size: 0.9em;
+            color: #495057;
+            margin-bottom: 0; /* Remove margin-bottom do label */
+            display: inline-flex; /* Para que a label se ajuste ao conteúdo */
+            align-items: center;
+            gap: 5px;
+        }
+        .tech-selection input[type="checkbox"]:checked + label.checkbox-label {
+            background-color: var(--primary-green);
+            border-color: var(--primary-green);
+            color: var(--header-text);
+        }
+        .tech-selection label.checkbox-label:hover {
+            background-color: #d1d9e6;
+        }
+        .tech-selection input[type="checkbox"]:checked + label.checkbox-label:hover {
+            background-color: #27ae60;
+        }
+
+
+        /* Modal de Edição */
+        #editTicketModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1001; /* Acima de outros elementos */
+        }
+        #editTicketModal > div { /* Conteúdo do modal */
+            background: var(--card-background);
+            padding: 30px;
+            border-radius: 12px;
+            width: 550px;
+            max-width: 90%;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+            color: var(--light-text);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        #editTicketModal h2 {
+            margin-top: 0;
+            color: var(--primary-green);
+            font-size: 1.6em;
+            margin-bottom: 0;
+        }
+        #editTicketModal button {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            transition: background-color 0.2s ease;
+            margin-top: 10px; /* Espaço entre os botões */
+        }
+        #editTicketModal #saveEditBtn {
+            background-color: var(--primary-green);
+            color: var(--header-text);
+        }
+        #editTicketModal #saveEditBtn:hover {
+            background-color: #27ae60;
+        }
+        #editTicketModal #cancelEditBtn {
+            background-color: var(--secondary-button-bg);
+            color: var(--header-text);
+        }
+        #editTicketModal #cancelEditBtn:hover {
+            background-color: #5a6268;
+        }
+        
+        /* Media Queries para Responsividade */
+        @media (max-width: 768px) {
+            header {
+                flex-direction: column;
+                padding: 15px 20px;
+                gap: 15px;
+            }
+            header h1 {
+                font-size: 1.5em;
+            }
+            .user-info {
+                width: 100%;
+                justify-content: center;
+            }
+            main {
+                padding: 20px 10px;
+            }
+            .main-action-buttons {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .main-action-buttons .action-button {
+                width: 100%; /* Botões ocupam largura total em telas menores */
+            }
+            .ticket-list {
+                grid-template-columns: 1fr; /* Uma coluna em telas menores */
+            }
+            .info-grid-details {
+                grid-template-columns: 1fr; /* Uma coluna para detalhes do ticket */
+            }
+            form {
+                padding: 20px;
+            }
+            input[type="text"], textarea, select {
+                width: calc(100% - 20px); /* Ajusta padding */
+            }
+        }
+        @media (max-width: 480px) {
+            header h1 {
+                font-size: 1.3em;
+            }
+            .user-info span {
+                display: none; /* Esconde nome do usuário em telas muito pequenas */
+            }
+            .ticket-item .actions button {
+                font-size: 0.85em;
+                padding: 8px 12px;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="logout-button-container">
-        <a href="logout.php" class="action-button logout-btn">
-            <i class="fa-solid fa-right-from-bracket"></i> Sair
-        </a>
-    </div>
-
-    <h1><i class="fa-solid fa-ticket"></i> Gestão de Tickets de Serviço</h1>
-    <h2>Bem-vindo, <?php echo htmlspecialchars($username); ?>!</h2>
-
-    <form id="ticketForm">
-        <h2>Abrir Novo Ticket</h2>
-        <div class="error-messages" id="formErrors"></div>
-
-        <div class="form-group">
-            <div class="tech-selection">
-                <label>Atribuir a Funcionário(s) da TI:</label>
-                <div id="techsContainer">
-                    </div>
+    <div class="main-wrapper">
+        <header>
+            <h1><i class="fa-solid fa-headset"></i> Gestão de Tickets</h1>
+            <div class="user-info">
+                <span>Bem-vindo, <?php echo htmlspecialchars($username); ?>!</span>
+                <a href="logout.php" class="action-button">
+                    <i class="fa-solid fa-right-from-bracket"></i> Sair
+                </a>
             </div>
-        </div>
+        </header>
 
-        <div class="form-group">
-            <label for="sector">Setor:</label>
-            <input type="text" id="sector" name="sector" required />
-        </div>
+        <main>
+            <div class="main-action-buttons">
+                <button id="showMainTicketsBtn" class="action-button active"><i class="fa-solid fa-inbox"></i> Tickets Ativos</button>
+                <button id="showNewTicketFormBtn" class="action-button"><i class="fa-solid fa-plus-circle"></i> Abrir Novo Ticket</button>
+                <button id="showArchivedTicketsBtn" class="action-button"><i class="fa-solid fa-box-archive"></i> Tickets Arquivados</button>
+                <button id="archiveAllResolvedBtn" class="action-button danger"><i class="fa-solid fa-box-archive"></i> Arquivar Resolvidos</button>
+                <a href="generate_pdf.php" target="_blank" class="action-button info-color"><i class="fa-solid fa-file-pdf"></i> Gerar Relatório PDF</a>
+            </div>
 
-        <div class="form-group">
-            <label for="type">Tipo de Serviço:</label>
-            <select id="type" name="type" required>
-                <option value="">Selecione</option>
-                <option value="Hardware">Hardware</option>
-                <option value="Software">Software</option>
-                <option value="Rede">Rede</option>
-                <option value="Suporte Geral">Suporte Geral</option>
-            </select>
-        </div>
+            <div id="message"></div>
 
-        <div class="form-group">
-            <label for="priority">Prioridade:</label>
-            <select id="priority" name="priority" required>
-                <option value="">Selecione</option>
-                <option value="Baixa">Baixa</option>
-                <option value="Média">Média</option>
-                <option value="Alta">Alta</option>
-                <option value="Urgente">Urgente</option>
-            </select>
-        </div>
+            <form id="newTicketForm" style="display:none;">
+                <h2>Abrir Novo Ticket</h2>
+                <div class="form-group">
+                    <label for="usuario">Solicitante:</label>
+                    <input type="text" id="usuario" name="usuario" value="<?php echo htmlspecialchars($username); ?>" required readonly />
+                </div>
+                <div class="form-group">
+                    <label for="sector">Setor:</label>
+                    <input type="text" id="sector" name="sector" required />
+                </div>
+                <div class="form-group">
+                    <label for="type">Tipo de Serviço:</label>
+                    <select id="type" name="type" required>
+                        <option value="">Selecione...</option>
+                        <option value="Hardware">Hardware</option>
+                        <option value="Software">Software</option>
+                        <option value="Rede">Rede</option>
+                        <option value="Outro">Outro</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="priority">Prioridade:</label>
+                    <select id="priority" name="priority" required>
+                        <option value="">Selecione...</option>
+                        <option value="Baixa">Baixa</option>
+                        <option value="Média">Média</option>
+                        <option value="Alta">Alta</option>
+                        <option value="Urgente">Urgente</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="description">Descrição:</label>
+                    <textarea id="description" name="description" required></textarea>
+                </div>
+                
+                <div class="tech-selection">
+                    <label>Atribuir Técnicos:</label>
+                    <div>
+                        <input type="checkbox" id="techAlexandre" name="techs[]" value="Alexandre">
+                        <label for="techAlexandre" class="checkbox-label"><i class="fa-solid fa-user-tie"></i> Alexandre</label>
+                        
+                        <input type="checkbox" id="techBruno" name="techs[]" value="Bruno">
+                        <label for="techBruno" class="checkbox-label"><i class="fa-solid fa-user-tie"></i> Bruno</label>
 
-        <div class="form-group">
-            <label for="description">Descrição do Problema:</label>
-            <textarea id="description" name="description" required></textarea>
-        </div>
+                        <input type="checkbox" id="techJhonatan" name="techs[]" value="Jhonatan">
+                        <label for="techJhonatan" class="checkbox-label"><i class="fa-solid fa-user-tie"></i> Jhonatan</label>
 
-        <button type="submit">Abrir Ticket</button>
-    </form>
+                        <input type="checkbox" id="techVitoria" name="techs[]" value="Vitoria">
+                        <label for="techVitoria" class="checkbox-label"><i class="fa-solid fa-user-tie"></i> Vitoria</label>
 
-    <div class="main-action-buttons">
-        <button onclick="showMainTickets()" class="action-button" id="showMainTicketsBtn">
-            <i class="fa-solid fa-ticket"></i> Tickets Ativos
-        </button>
-        <button onclick="generateReport()" class="action-button">
-            <i class="fa-solid fa-file-alt"></i> Relatório Geral
-        </button>
-        <a href="generate_pdf.php" target="_blank" class="action-button">
-            <i class="fa-solid fa-file-pdf"></i> Baixar PDF
-        </a>
-        <?php if ($username === 'admin'): ?>
-            <button id="archiveAllTicketsButton" class="action-button archive-all-btn">
-                <i class="fa-solid fa-box-archive"></i> Arquivar Todos
-            </button>
-        <?php endif; ?>
-        <button onclick="showArchivedTickets()" class="action-button view-archive-btn">
-            <i class="fa-solid fa-folder-open"></i> Ver Arquivados
-        </button>
-    </div>
+                        <input type="checkbox" id="techMatheus" name="techs[]" value="Matheus">
+                        <label for="techMatheus" class="checkbox-label"><i class="fa-solid fa-user-tie"></i> Matheus</label>
 
-    <hr>
+                        <input type="checkbox" id="techMarcio" name="techs[]" value="Marcio">
+                        <label for="techMarcio" class="checkbox-label"><i class="fa-solid fa-user-tie"></i> Marcio</label>
 
-    <div class="ticket-list" id="activeTicketsSection" style="display: none;">
-        <div class="filter-buttons">
-            <button id="filterTodos" onclick="applyFilter('Todos')" class="filter-button secondary-button-color">
-                <i class="fa-solid fa-list-ul"></i> Todos
-            </button>
-            <button id="filterAberto" onclick="applyFilter('Aberto')" class="filter-button" style="background-color: var(--pending);">
-                <i class="fa-solid fa-clock"></i> Abertos
-            </button>
-            <button id="filterResolvido" onclick="applyFilter('Resolvido')" class="filter-button" style="background-color: var(--resolved);">
-                <i class="fa-solid fa-check-double"></i> Resolvidos
-            </button>
-        </div>
-        <h2>Tickets Existentes</h2>
-        <div id="ticketsContainer">
-            <p style="text-align: center;">Carregando tickets...</p>
-        </div>
-    </div>
+                        <input type="checkbox" id="techWilly" name="techs[]" value="Willy">
+                        <label for="techWilly" class="checkbox-label"><i class="fa-solid fa-user-tie"></i> Willy</label>
+                    </div>
+                </div>
 
-    <div class="ticket-list" id="archivedTicketsSection" style="display: none;">
-        <h2>Tickets Arquivados</h2>
-        <div class="archive-filter-controls">
-            <label for="archiveMonth">Mês:</label>
-            <select id="archiveMonth" onchange="filterArchivedTickets()">
-                <option value="0">Todos</option>
-                <option value="1">Janeiro</option>
-                <option value="2">Fevereiro</option>
-                <option value="3">Março</option>
-                <option value="4">Abril</option>
-                <option value="5">Maio</option>
-                <option value="6">Junho</option>
-                <option value="7">Julho</option>
-                <option value="8">Agosto</option>
-                <option value="9">Setembro</option>
-                <option value="10">Outubro</option>
-                <option value="11">Novembro</option>
-                <option value="12">Dezembro</option>
-            </select>
+                <button type="submit">Criar Ticket</button>
+                <div class="error-messages" id="formErrorMessages"></div>
+            </form>
 
-            <label for="archiveYear">Ano:</label>
-            <select id="archiveYear" onchange="filterArchivedTickets()">
-                </select>
-        </div>
-        <div id="archivedTicketsContainer">
-            <p style="text-align: center;">Carregando tickets arquivados...</p>
-        </div>
-    </div>
+            <section id="activeTicketsSection">
+                <h2>Tickets Ativos</h2>
+                <div class="filter-buttons">
+                    <button id="filterTodos" class="filter-button active"><i class="fa-solid fa-list-ul"></i> Todos</button>
+                    <button id="filterAberto" class="filter-button"><i class="fa-solid fa-hourglass-start"></i> Aberto</button>
+                    <button id="filterResolvido" class="filter-button"><i class="fa-solid fa-check-double"></i> Resolvido</button>
+                </div>
+                <div id="ticketsContainer" class="ticket-list">
+                    </div>
+            </section>
 
-    <div class="ticket-list" id="reportContainer" style="display: none;">
-        <h2>Relatório Geral de Tickets</h2>
-        <div id="reportContent">
-            <p style="text-align: center;">Clique no botão acima para gerar o relatório.</p>
-        </div>
-        <div style="text-align: center; margin-top: 20px;">
-            <button onclick="hideReport()" class="action-button secondary-button-color">
-                <i class="fa-solid fa-times"></i> Fechar Relatório
-            </button>
-        </div>
+            <section id="archivedTicketsSection" style="display:none;">
+                <h2>Tickets Arquivados</h2>
+                <div class="archive-filter-controls">
+                    <label for="archiveYearFilter">Ano:</label>
+                    <select id="archiveYearFilter"></select>
+                    <label for="archiveMonthFilter">Mês:</label>
+                    <select id="archiveMonthFilter">
+                        <option value="">Todos</option>
+                        <option value="01">Janeiro</option>
+                        <option value="02">Fevereiro</option>
+                        <option value="03">Março</option>
+                        <option value="04">Abril</option>
+                        <option value="05">Maio</option>
+                        <option value="06">Junho</option>
+                        <option value="07">Julho</option>
+                        <option value="08">Agosto</option>
+                        <option value="09">Setembro</option>
+                        <option value="10">Outubro</option>
+                        <option value="11">Novembro</option>
+                        <option value="12">Dezembro</option>
+                    </select>
+                </div>
+                <div id="archivedTicketsContainer" class="ticket-list">
+                    </div>
+            </section>
+
+            <div id="editTicketModal" style="display:none;">
+                <div>
+                    <h2>Editar Ticket <span id="editTicketIdDisplay"></span></h2>
+                    <input type="hidden" id="editTicketId">
+                    <div class="form-group">
+                        <label for="editStatus">Status:</label>
+                        <select id="editStatus" required>
+                            <option value="Aberto">Aberto</option>
+                            <option value="Resolvido">Resolvido</option>
+                        </select>
+                    </div>
+                    <div class="tech-selection">
+                        <label>Atribuir Técnicos:</label>
+                        <div id="editTechsContainer">
+                            </div>
+                    </div>
+                    <button id="saveEditBtn">Salvar Alterações</button>
+                    <button id="cancelEditBtn">Cancelar</button>
+                </div>
+            </div>
+        </main>
     </div>
 
     <script>
-        const allTechs = ["Alexandre", "Bruno", "Jhonatan", "Vitoria", "Matheus", "Marcio", "Willy"];
-        let currentSelectedTechs = [];
-        let currentFilter = 'Todos'; // Para tickets ativos
+        const ticketsContainer = document.getElementById('ticketsContainer');
+        const archivedTicketsContainer = document.getElementById('archivedTicketsContainer');
+        const newTicketForm = document.getElementById('newTicketForm');
+        const activeTicketsSection = document.getElementById('activeTicketsSection');
+        const archivedTicketsSection = document.getElementById('archivedTicketsSection');
+        const showMainTicketsBtn = document.getElementById('showMainTicketsBtn');
+        const showNewTicketFormBtn = document.getElementById('showNewTicketFormBtn');
+        const showArchivedTicketsBtn = document.getElementById('showArchivedTicketsBtn');
+        const archiveAllResolvedBtn = document.getElementById('archiveAllResolvedBtn');
+        const messageDiv = document.getElementById('message');
+        const formErrorMessages = document.getElementById('formErrorMessages');
 
-        // Removidas variáveis para instâncias de gráfico Chart.js
+        const filterTodos = document.getElementById('filterTodos');
+        const filterAberto = document.getElementById('filterAberto');
+        const filterResolvido = document.getElementById('filterResolvido');
 
-        // Função para mostrar a seção de tickets ativos
-        function showMainTickets() {
-            document.getElementById('activeTicketsSection').style.display = 'block';
-            document.getElementById('archivedTicketsSection').style.display = 'none';
-            document.getElementById('reportContainer').style.display = 'none';
-            // Removida a linha que ocultava o dashboard
-            renderTickets(); // Renderiza tickets ativos
-            updateFilterButtonStyles(); // Atualiza estilo dos botões de filtro de ativos
-            updateActionButtonStyles('showMainTicketsBtn'); // Ativa o botão correspondente
+        const editTicketModal = document.getElementById('editTicketModal');
+        const editTicketIdDisplay = document.getElementById('editTicketIdDisplay');
+        const editTicketIdInput = document.getElementById('editTicketId');
+        const editStatusSelect = document.getElementById('editStatus');
+        const editTechsContainer = document.getElementById('editTechsContainer');
+        const saveEditBtn = document.getElementById('saveEditBtn');
+        const cancelEditBtn = document.getElementById('cancelEditBtn');
+
+        const archiveYearFilter = document.getElementById('archiveYearFilter');
+        const archiveMonthFilter = document.getElementById('archiveMonthFilter');
+
+        // Lista global de técnicos (importante para manter a consistência)
+        const ALL_TECHS = ["Alexandre", "Bruno", "Jhonatan", "Vitoria", "Matheus", "Marcio", "Willy"];
+
+
+        let currentFilter = 'Todos'; // 'Todos', 'Aberto', 'Resolvido'
+
+        // Função para mostrar mensagens temporárias
+        function showMessage(msg, type = 'success') {
+            messageDiv.textContent = msg;
+            messageDiv.style.backgroundColor = type === 'success' ? 'var(--primary-green)' : 'var(--danger-red)';
+            messageDiv.style.display = 'block';
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 5000);
         }
 
-        // Função para mostrar a seção de tickets arquivados
-        function showArchivedTickets() {
-            document.getElementById('activeTicketsSection').style.display = 'none';
-            document.getElementById('archivedTicketsSection').style.display = 'block';
-            document.getElementById('reportContainer').style.display = 'none';
-            // Removida a linha que ocultava o dashboard
-            populateArchiveYearFilter(); // Popula os anos antes de carregar
-            filterArchivedTickets(); // Carrega tickets arquivados com o filtro atual
-            updateActionButtonStyles('view-archive-btn'); // Ativa o botão correspondente
-        }
-
-        // Removida a função showDashboard()
-
-        // Função para atualizar os estilos dos botões de ação global
-        function updateActionButtonStyles(activeButtonId) {
-            const buttons = document.querySelectorAll('.main-action-buttons .action-button');
-            buttons.forEach(button => {
-                button.classList.remove('active');
+        // Função para mostrar erros do formulário
+        function showFormErrors(errors) {
+            formErrorMessages.innerHTML = '';
+            const ul = document.createElement('ul');
+            errors.forEach(error => {
+                const li = document.createElement('li');
+                li.textContent = error;
+                ul.appendChild(li);
             });
-            const activeButton = document.getElementById(activeButtonId);
-            if (activeButton) {
-                activeButton.classList.add('active');
-            }
-            // Workaround para o botão "Ver Arquivados" que tem uma classe genérica
-            if (activeButtonId === 'view-archive-btn') {
-                document.querySelector('.main-action-buttons .action-button.view-archive-btn').classList.add('active');
-            }
+            formErrorMessages.appendChild(ul);
         }
 
-        function renderTechCheckboxes() {
-            const container = document.getElementById('techsContainer');
-            container.innerHTML = '';
-            allTechs.forEach(tech => {
-                const checkboxId = `tech_${tech.toLowerCase().replace(/\s/g, '')}`;
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.id = checkboxId;
-                checkbox.value = tech;
-                checkbox.checked = currentSelectedTechs.includes(tech);
-                checkbox.onchange = (e) => {
-                    if (e.target.checked) {
-                        currentSelectedTechs.push(tech);
-                    } else {
-                        currentSelectedTechs = currentSelectedTechs.filter(t => t !== tech);
+        // Função para esconder erros do formulário
+        function hideFormErrors() {
+            formErrorMessages.innerHTML = '';
+        }
+
+        // Renderiza os tickets na UI
+        function renderTickets(ticketsToRender, container, isArchivedView = false) {
+            container.innerHTML = ''; // Limpa a lista existente
+            if (ticketsToRender.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #777;">Nenhum ticket encontrado.</p>';
+                return;
+            }
+
+            ticketsToRender.forEach(ticket => {
+                const ticketItem = document.createElement('div');
+                const statusClass = ticket.status === 'Aberto' ? 'Aberto' : 'Resolvido';
+                
+                ticketItem.classList.add('ticket-item');
+
+                if (!isArchivedView) { // Adiciona classes de status apenas para tickets NÃO arquivados
+                    if (ticket.status === 'Aberto') {
+                        ticketItem.classList.add('status-open-ticket');
+                    } else if (ticket.status === 'Resolvido') {
+                        ticketItem.classList.add('status-resolved-ticket');
                     }
-                };
-
-                const label = document.createElement('label');
-                label.htmlFor = checkboxId;
-                label.textContent = tech;
-                label.classList.add('checkbox-label');
-
-                container.appendChild(checkbox);
-                container.appendChild(label);
-            });
-        }
-
-        renderTechCheckboxes();
-
-        function applyFilter(filterType) {
-            currentFilter = filterType;
-            renderTickets();
-            updateFilterButtonStyles();
-        }
-
-        function updateFilterButtonStyles() {
-            const buttons = document.querySelectorAll('.filter-buttons .filter-button');
-            buttons.forEach(button => {
-                button.classList.remove('active');
-            });
-
-            const activeButton = document.getElementById(`filter${currentFilter.replace(/\s/g, '')}`);
-            if (activeButton) {
-                activeButton.classList.add('active');
-            }
-        }
-
-        async function renderTickets() {
-            const ticketsContainer = document.getElementById('ticketsContainer');
-            ticketsContainer.innerHTML = '<p style="text-align: center;">Carregando tickets...</p>';
-            const res = await fetch('get_tickets.php');
-            const tickets = await res.json();
-
-            let filteredTickets = tickets;
-            if (currentFilter !== 'Todos') {
-                filteredTickets = tickets.filter(ticket => ticket.status === currentFilter);
-            }
-
-            ticketsContainer.innerHTML = '';
-
-            if (filteredTickets.length === 0) {
-                ticketsContainer.innerHTML = '<p style="text-align: center;">Nenhum ticket encontrado com este filtro.</p>';
-                return;
-            }
-
-            filteredTickets.forEach(ticket => {
-                const div = document.createElement('div');
-                div.classList.add('ticket-item');
-
-                let itemBgClass = `status-${ticket.status.replace(/\s/g, '')}-bg`;
-                div.classList.add(itemBgClass);
-
-                const createdAt = new Date(ticket.createdAt).toLocaleString('pt-BR');
-                const techsText = ticket.techs && ticket.techs.length > 0 ? ticket.techs.join(', ') : 'Nenhum';
-
-                let statusClass = ticket.status.replace(/\s/g, '');
-
-                div.innerHTML = `
-                    <h3>Ticket ID: <span style="color: #666;">${ticket.id.substring(0, 8)}...</span>
-                        <span class="status ${statusClass}">${ticket.status}</span>
-                    </h3>
-                    <div class="info-grid-details">
-                        <div><strong>Usuário:</strong> <span>${ticket.usuario}</span></div>
-                        <div><strong>Setor:</strong> <span>${ticket.sector}</span></div>
-                        <div><strong>Tipo:</strong> <span>${ticket.type}</span></div>
-                        <div><strong>Prioridade:</strong> <span>${ticket.priority}</span></div>
-                        <div><strong>Atribuído a:</strong> <span>${techsText}</span></div>
-                        <div><strong>Criado em:</strong> <span>${createdAt}</span></div>
-                    </div>
-                    <div class="description-box">
-                        <strong>Descrição:</strong> ${ticket.description}
-                    </div>
-                    <div class="actions">
-                        <?php if ($username === 'admin'): ?>
-                            ${ticket.status === 'Aberto' ? `<button class="resolve-btn" onclick="updateTicketStatus('${encodeURIComponent(ticket.id)}', 'Resolvido')"><i class="fa-solid fa-check"></i> Resolver</button>` : ''}
-                            <button class="delete-btn" onclick="deleteTicket('${encodeURIComponent(ticket.id)}')"><i class="fa-solid fa-trash"></i> Apagar</button>
-                        <?php endif; ?>
-                    </div>
-                `;
-                ticketsContainer.appendChild(div);
-            });
-        }
-
-        async function filterArchivedTickets() {
-            const archivedTicketsContainer = document.getElementById('archivedTicketsContainer');
-            archivedTicketsContainer.innerHTML = '<p style="text-align: center;">Carregando tickets arquivados...</p>';
-
-            const month = document.getElementById('archiveMonth').value;
-            const year = document.getElementById('archiveYear').value;
-
-            const res = await fetch(`get_archived_tickets.php?month=${month}&year=${year}`);
-            const tickets = await res.json();
-
-            archivedTicketsContainer.innerHTML = '';
-
-            if (tickets.length === 0) {
-                archivedTicketsContainer.innerHTML = '<p style="text-align: center;">Nenhum ticket arquivado encontrado para este período.</p>';
-                return;
-            }
-
-            tickets.forEach(ticket => {
-                const div = document.createElement('div');
-                div.classList.add('ticket-item', 'archived-item'); // Adiciona classe para estilo de arquivado
-
-                const createdAt = new Date(ticket.createdAt).toLocaleString('pt-BR');
-                const techsText = ticket.techs && ticket.techs.length > 0 ? ticket.techs.join(', ') : 'Nenhum';
-                let statusClass = ticket.status.replace(/\s/g, '');
-
-                div.innerHTML = `
-                    <h3>Ticket ID: <span style="color: #666;">${ticket.id.substring(0, 8)}...</span>
-                        <span class="status ${statusClass}">${ticket.status}</span>
-                    </h3>
-                    <div class="info-grid-details">
-                        <div><strong>Usuário:</strong> <span>${ticket.usuario}</span></div>
-                        <div><strong>Setor:</strong> <span>${ticket.sector}</span></div>
-                        <div><strong>Tipo:</strong> <span>${ticket.type}</span></div>
-                        <div><strong>Prioridade:</strong> <span>${ticket.priority}</span></div>
-                        <div><strong>Atribuído a:</strong> <span>${techsText}</span></div>
-                        <div><strong>Criado em:</strong> <span>${createdAt}</span></div>
-                    </div>
-                    <div class="description-box">
-                        <strong>Descrição:</strong> ${ticket.description}
-                    </div>
-                    `;
-                archivedTicketsContainer.appendChild(div);
-            });
-        }
-
-        // Função para preencher os anos no filtro de arquivados
-        function populateArchiveYearFilter() {
-            const yearSelect = document.getElementById('archiveYear');
-            const currentYear = new Date().getFullYear();
-            
-            // Limpa opções existentes, exceto "Todos" se já houver
-            yearSelect.innerHTML = '<option value="0">Todos</option>';
-
-            // Adiciona 5 anos para trás e 1 ano para frente (ajuste conforme necessidade)
-            for (let i = currentYear + 1; i >= currentYear - 5; i--) {
-                const option = document.createElement('option');
-                option.value = i;
-                option.textContent = i;
-                yearSelect.appendChild(option);
-            }
-            // Seleciona o ano atual por padrão, se estiver na lista
-            yearSelect.value = currentYear;
-        }
-
-        async function updateTicketStatus(id, status) {
-            const res = await fetch('update_ticket.php', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({id, status})
-            });
-            const data = await res.json();
-            if (data.success) {
-                renderTickets();
-            } else {
-                alert('Erro ao atualizar ticket: ' + (data.message || 'Erro desconhecido.'));
-            }
-        }
-
-        async function deleteTicket(id) {
-            if (!confirm('Confirma apagar este ticket?')) return;
-            const res = await fetch('delete_ticket.php', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({id})
-            });
-            const data = await res.json();
-            if (data.success) {
-                renderTickets();
-            } else {
-                alert('Erro ao apagar ticket: ' + (data.message || 'Erro desconhecido.'));
-            }
-        }
-
-        async function generateReport() {
-            const reportContainer = document.getElementById('reportContainer');
-            const reportContent = document.getElementById('reportContent');
-
-            document.getElementById('activeTicketsSection').style.display = 'none';
-            document.getElementById('archivedTicketsSection').style.display = 'none';
-            // Removida a linha que ocultava o dashboard
-            reportContainer.style.display = 'block'; // Mostra o container do relatório
-
-            reportContent.innerHTML = '<p style="text-align: center;">Gerando relatório...</p>';
-
-            const res = await fetch('get_report.php');
-            const tickets = await res.json();
-
-            if (tickets.success === false && tickets.message) {
-                reportContent.innerHTML = `<p style="text-align: center; color: red;">${tickets.message}</p>`;
-                return;
-            }
-
-            if (tickets.length === 0) {
-                reportContent.innerHTML = '<p style="text-align: center;">Nenhum ticket encontrado para o relatório.</p>';
-                return;
-            }
-
-            let tableHtml = `
-                <table border="1">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Usuário</th>
-                            <th>Setor</th>
-                            <th>Tipo</th>
-                            <th>Prioridade</th>
-                            <th>Status</th>
-                            <th>Atribuído a</th>
-                            <th>Criado Em</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-            tickets.forEach(ticket => {
-                const createdAt = new Date(ticket.createdAt).toLocaleString('pt-BR');
-                const techsText = ticket.techs && ticket.techs.length > 0 ? ticket.techs.join(', ') : 'Nenhum';
-                tableHtml += `
-                    <tr>
-                        <td>${ticket.id.substring(0, 8)}...</td>
-                        <td>${ticket.usuario}</td>
-                        <td>${ticket.sector}</td>
-                        <td>${ticket.type}</td>
-                        <td>${ticket.priority}</td>
-                        <td>${ticket.status}</td>
-                        <td>${techsText}</td>
-                    </tr>
-                `;
-            });
-            tableHtml += `
-                    </tbody>
-                </table>
-            `;
-            reportContent.innerHTML = tableHtml;
-        }
-
-        function hideReport() {
-            document.getElementById('reportContainer').style.display = 'none';
-            // Volta para a seção de tickets ativos por padrão
-            showMainTickets();
-        }
-
-        document.getElementById('ticketForm').onsubmit = async e => {
-            e.preventDefault();
-            const formErrorsDiv = document.getElementById('formErrors');
-            formErrorsDiv.innerHTML = '';
-
-            if (!currentSelectedTechs.length) {
-                formErrorsDiv.innerHTML = '<ul><li>Selecione ao menos um funcionário da TI.</li></ul>';
-                return;
-            }
-
-            const sector = document.getElementById('sector').value.trim();
-            const type = document.getElementById('type').value;
-            const priority = document.getElementById('priority').value;
-            const description = document.getElementById('description').value.trim();
-
-            if (!sector || !type || !priority || !description) {
-                formErrorsDiv.innerHTML = '<ul><li>Todos os campos são obrigatórios.</li></ul>';
-                return;
-            }
-
-            const formData = new URLSearchParams();
-            formData.append('techs', JSON.stringify(currentSelectedTechs));
-            formData.append('sector', sector);
-            formData.append('type', type);
-            formData.append('priority', priority);
-            formData.append('description', description);
-
-            const res = await fetch('processa_ticket.php', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: formData
-            });
-
-            const data = await res.json();
-
-            if (data.success) {
-                alert('Ticket aberto com sucesso!');
-                renderTickets();
-                document.getElementById('ticketForm').reset();
-                currentSelectedTechs = [];
-                renderTechCheckboxes();
-            } else {
-                if (data.errors && data.errors.length > 0) {
-                    formErrorsDiv.innerHTML = '<ul>' + data.errors.map(err => `<li>${err}</li>`).join('') + '</ul>';
                 } else {
-                    formErrorsDiv.innerHTML = '<ul><li>Erro ao abrir ticket. Tente novamente.</li></ul>';
+                    ticketItem.classList.add('archived-item'); // Adiciona classe para estilo de arquivado
                 }
+
+                const techsList = ticket.techs && ticket.techs.length > 0 ? ticket.techs.map(tech => htmlspecialchars(tech)).join(', ') : 'N/A';
+
+                let actionsHtml = '';
+                if (!isArchivedView) { // Botões de ação só para tickets ativos
+                    actionsHtml = `
+                        <button class="resolve-btn" data-id="${ticket.id}"><i class="fa-solid fa-check-circle"></i> Resolver</button>
+                        <button class="edit-btn" data-id="${ticket.id}"><i class="fa-solid fa-edit"></i> Editar</button>
+                        <button class="delete-btn" data-id="${ticket.id}"><i class="fa-solid fa-trash"></i> Apagar</button>
+                    `;
+                }
+
+                ticketItem.innerHTML = `
+                    <h3>
+                        Ticket ID: ${htmlspecialchars(ticket.id.substring(0, 8))} <span class="status ${statusClass}">${htmlspecialchars(ticket.status)}</span>
+                    </h3>
+                    <div class="info-grid-details">
+                        <div><strong>Solicitante</strong> <span>${htmlspecialchars(ticket.usuario)}</span></div>
+                        <div><strong>Setor</strong> <span>${htmlspecialchars(ticket.sector)}</span></div>
+                        <div><strong>Tipo</strong> <span>${htmlspecialchars(ticket.type)}</span></div>
+                        <div><strong>Prioridade</strong> <span>${htmlspecialchars(ticket.priority)}</span></div>
+                    </div>
+                    <div class="description-box">
+                        <strong>Descrição</strong>
+                        <p>${nl2br(htmlspecialchars(ticket.description))}</p>
+                    </div>
+                    <p><strong>Técnicos:</strong> ${techsList}</p>
+                    <p><strong>Criado em:</strong> ${formatDate(ticket.createdAt)}</p>
+                    <p><strong>Atualizado em:</strong> ${ticket.updatedAt ? formatDate(ticket.updatedAt) : 'N/A'}</p>
+                    <div class="actions">
+                        ${actionsHtml}
+                    </div>
+                `;
+                container.appendChild(ticketItem);
+            });
+
+            if (!isArchivedView) {
+                // Adiciona event listeners para os botões de resolver, editar e apagar
+                container.querySelectorAll('.resolve-btn').forEach(button => {
+                    button.addEventListener('click', async (event) => {
+                        const ticketId = event.currentTarget.dataset.id;
+                        if (confirm(`Tem certeza que deseja marcar o ticket ${ticketId} como RESOLVIDO?`)) {
+                            try {
+                                const response = await fetch('update_ticket.php', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ id: ticketId, status: 'Resolvido' })
+                                });
+                                const result = await response.json();
+                                if (result.success) {
+                                    showMessage('Ticket resolvido com sucesso!');
+                                    fetchAndRenderTickets(currentFilter); // Atualiza a lista com o filtro atual
+                                } else {
+                                    showMessage(`Erro: ${result.message}`, 'error');
+                                }
+                            } catch (error) {
+                                console.error('Erro ao resolver ticket:', error);
+                                showMessage('Erro ao comunicar com o servidor.', 'error');
+                            }
+                        }
+                    });
+                });
+
+                container.querySelectorAll('.edit-btn').forEach(button => {
+                    button.addEventListener('click', async (event) => {
+                        const ticketId = event.currentTarget.dataset.id;
+                        await openEditModal(ticketId);
+                    });
+                });
+
+                container.querySelectorAll('.delete-btn').forEach(button => {
+                    button.addEventListener('click', async (event) => {
+                        const ticketId = event.currentTarget.dataset.id;
+                        if (confirm(`Tem certeza que deseja APAGAR o ticket ${ticketId}? Esta ação é irreversível.`)) {
+                            try {
+                                const response = await fetch('delete_ticket.php', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ id: ticketId })
+                                });
+                                const result = await response.json();
+                                if (result.success) {
+                                    showMessage('Ticket excluído com sucesso!');
+                                    fetchAndRenderTickets(currentFilter); // Atualiza a lista com o filtro atual
+                                } else {
+                                    showMessage(`Erro ao excluir: ${result.message}`, 'error');
+                                }
+                            } catch (error) {
+                                console.error('Erro ao excluir ticket:', error);
+                                showMessage('Erro ao comunicar com o servidor.', 'error');
+                            }
+                        }
+                    });
+                });
             }
-        };
+        }
 
-        // Removidas todas as funções do Dashboard (fetchAllTickets, renderDashboard, renderChart)
+        // Função para formatar a data para exibição
+        function formatDate(dateString) {
+            const options = { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' };
+            return new Date(dateString).toLocaleString('pt-BR', options);
+        }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            // Event listener para o botão "Arquivar Todos os Tickets"
-            const archiveAllButton = document.getElementById('archiveAllTicketsButton');
-            if (archiveAllButton) {
-                archiveAllButton.addEventListener('click', async () => {
-                    if (!confirm('Tem certeza que deseja arquivar TODOS os tickets existentes? Esta ação não pode ser desfeita.')) {
-                        return;
+        // Função para obter e exibir tickets (ativos)
+        async function fetchAndRenderTickets(filter = 'Todos') {
+            try {
+                let url = 'get_tickets.php';
+                const response = await fetch(url);
+                let tickets = await response.json();
+
+                // Filtragem no lado do cliente
+                if (filter === 'Aberto') {
+                    tickets = tickets.filter(ticket => ticket.status === 'Aberto');
+                } else if (filter === 'Resolvido') {
+                    tickets = tickets.filter(ticket => ticket.status === 'Resolvido');
+                }
+                renderTickets(tickets, ticketsContainer);
+            } catch (error) {
+                console.error('Erro ao buscar tickets:', error);
+                showMessage('Erro ao carregar tickets.', 'error');
+                ticketsContainer.innerHTML = '<p style="text-align: center; color: red;">Não foi possível carregar os tickets. Tente novamente.</p>';
+            }
+        }
+
+        // Função para obter e exibir tickets arquivados com filtros
+        async function filterArchivedTickets() {
+            try {
+                const selectedYear = archiveYearFilter.value;
+                const selectedMonth = archiveMonthFilter.value;
+                let url = 'get_archived_tickets.php';
+                
+                const response = await fetch(url);
+                let tickets = await response.json();
+
+                let filteredTickets = tickets;
+
+                if (selectedYear) {
+                    filteredTickets = filteredTickets.filter(ticket => {
+                        const ticketYear = new Date(ticket.createdAt).getFullYear().toString();
+                        return ticketYear === selectedYear;
+                    });
+                }
+
+                if (selectedMonth) {
+                    filteredTickets = filteredTickets.filter(ticket => {
+                        const ticketMonth = (new Date(ticket.createdAt).getMonth() + 1).toString().padStart(2, '0');
+                        return ticketMonth === selectedMonth;
+                    });
+                }
+                renderTickets(filteredTickets, archivedTicketsContainer, true); // Passa true para isArchivedView
+            } catch (error) {
+                console.error('Erro ao buscar tickets arquivados:', error);
+                showMessage('Erro ao carregar tickets arquivados.', 'error');
+                archivedTicketsContainer.innerHTML = '<p style="text-align: center; color: red;">Não foi possível carregar os tickets arquivados. Tente novamente.</p>';
+            }
+        }
+
+        // Função para popular os anos no filtro de arquivados
+        async function populateArchiveYearFilter() {
+            let years = new Set(); // Use um Set para armazenar anos únicos
+
+            archiveYearFilter.innerHTML = '<option value="">Todos</option>'; // Adiciona sempre a opção 'Todos'
+
+            // Adiciona anos de 2025 a 2040
+            for (let year = 2040; year >= 2025; year--) {
+                years.add(year);
+            }
+            
+            const sortedYears = Array.from(years).sort((a, b) => b - a); // Ordena do mais recente para o mais antigo
+
+            sortedYears.forEach(year => {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year;
+                archiveYearFilter.appendChild(option);
+            });
+        }
+
+        // Função para abrir o modal de edição
+        async function openEditModal(ticketId) {
+            try {
+                const response = await fetch('get_tickets.php'); // Poderia ser um endpoint para um único ticket
+                const tickets = await response.json();
+                const ticketToEdit = tickets.find(ticket => ticket.id === ticketId);
+
+                if (ticketToEdit) {
+                    editTicketIdDisplay.textContent = ticketId.substring(0, 8); // Exibe apenas parte do ID
+                    editTicketIdInput.value = ticketId;
+                    editStatusSelect.value = ticketToEdit.status;
+
+                    // Popula checkboxes de técnicos usando a lista global ALL_TECHS
+                    editTechsContainer.innerHTML = '';
+                    ALL_TECHS.forEach(tech => {
+                        const isChecked = ticketToEdit.techs && ticketToEdit.techs.includes(tech);
+                        const checkboxId = `edit-tech-${tech.replace(/\s/g, '-')}`;
+                        editTechsContainer.innerHTML += `
+                            <input type="checkbox" id="${checkboxId}" name="editTechs[]" value="${htmlspecialchars(tech)}" ${isChecked ? 'checked' : ''}>
+                            <label for="${checkboxId}" class="checkbox-label"><i class="fa-solid fa-user-tie"></i> ${htmlspecialchars(tech)}</label>
+                        `;
+                    });
+
+                    editTicketModal.style.display = 'flex'; // Mostra o modal
+                } else {
+                    showMessage('Ticket não encontrado para edição.', 'error');
+                }
+            } catch (error) {
+                console.error('Erro ao carregar dados do ticket para edição:', error);
+                showMessage('Erro ao carregar dados do ticket.', 'error');
+            }
+        }
+
+        // Event listener para salvar edições do ticket
+        saveEditBtn.addEventListener('click', async () => {
+            const ticketId = editTicketIdInput.value;
+            const newStatus = editStatusSelect.value;
+            const selectedTechs = Array.from(editTechsContainer.querySelectorAll('input[name="editTechs[]"]:checked')).map(cb => cb.value);
+
+            try {
+                const response = await fetch('update_ticket.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: ticketId, status: newStatus, techs: selectedTechs })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showMessage('Ticket atualizado com sucesso!');
+                    editTicketModal.style.display = 'none'; // Esconde o modal
+                    fetchAndRenderTickets(currentFilter); // Atualiza a lista de tickets
+                } else {
+                    showMessage(`Erro ao atualizar: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                console.error('Erro ao salvar edição do ticket:', error);
+                showMessage('Erro ao comunicar com o servidor.', 'error');
+            }
+        });
+
+        // Event listener para cancelar edição
+        cancelEditBtn.addEventListener('click', () => {
+            editTicketModal.style.display = 'none';
+        });
+
+
+        // Funções de manipulação de exibição das seções
+        function showMainTickets() {
+            activeTicketsSection.style.display = 'block';
+            newTicketForm.style.display = 'none';
+            archivedTicketsSection.style.display = 'none';
+            showMainTicketsBtn.classList.add('active');
+            showNewTicketFormBtn.classList.remove('active');
+            showArchivedTicketsBtn.classList.remove('active');
+            fetchAndRenderTickets(currentFilter); // Renderiza os tickets ativos com o filtro atual
+        }
+
+        function showNewTicketForm() {
+            activeTicketsSection.style.display = 'none';
+            newTicketForm.style.display = 'block';
+            archivedTicketsSection.style.display = 'none';
+            showMainTicketsBtn.classList.remove('active');
+            showNewTicketFormBtn.classList.add('active');
+            showArchivedTicketsBtn.classList.remove('active');
+            hideFormErrors(); // Limpa erros anteriores ao abrir o formulário
+        }
+
+        function showArchivedTickets() {
+            activeTicketsSection.style.display = 'none';
+            newTicketForm.style.display = 'none';
+            archivedTicketsSection.style.display = 'block';
+            showMainTicketsBtn.classList.remove('active');
+            showNewTicketFormBtn.classList.remove('active');
+            showArchivedTicketsBtn.classList.add('active');
+            filterArchivedTickets(); // Carrega e filtra os tickets arquivados
+        }
+
+
+        // Event Listeners para os botões principais de navegação
+        showMainTicketsBtn.addEventListener('click', showMainTickets);
+        showNewTicketFormBtn.addEventListener('click', showNewTicketForm);
+        showArchivedTicketsBtn.addEventListener('click', showArchivedTickets);
+
+        // Event Listener para o formulário de novo ticket
+        newTicketForm.addEventListener('submit', async (event) => {
+            event.preventDefault(); // Evita o recarregamento da página
+
+            const formData = new FormData(newTicketForm);
+            const data = Object.fromEntries(formData.entries());
+
+            // Coleta os técnicos selecionados (checkboxes)
+            data.techs = Array.from(newTicketForm.querySelectorAll('input[name="techs[]"]:checked')).map(cb => cb.value);
+
+            // Validação simples
+            const errors = [];
+            if (!data.usuario) errors.push('O campo Solicitante é obrigatório.');
+            if (!data.sector) errors.push('O campo Setor é obrigatório.');
+            if (!data.type) errors.push('O campo Tipo de Serviço é obrigatório.');
+            if (!data.priority) errors.push('O campo Prioridade é obrigatório.');
+            if (!data.description) errors.push('O campo Descrição é obrigatório.');
+
+            if (errors.length > 0) {
+                showFormErrors(errors);
+                return;
+            } else {
+                hideFormErrors();
+            }
+
+            try {
+                const response = await fetch('processa_ticket.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    showMessage('Ticket criado com sucesso!');
+                    newTicketForm.reset(); // Limpa o formulário
+                    // Desmarca todos os técnicos após o reset
+                    newTicketForm.querySelectorAll('input[name="techs[]"]').forEach(checkbox => {
+                        checkbox.checked = false;
+                    });
+                    showMainTickets(); // Volta para a lista principal de tickets
+                } else {
+                    showMessage('Erro ao criar ticket: ' + result.message, 'error');
+                }
+            } catch (error) {
+                console.error('Erro na requisição:', error);
+                showMessage('Ocorreu um erro ao tentar criar o ticket. Verifique o console para detalhes.', 'error');
+            }
+        });
+
+        // Event Listeners para os botões de filtro de tickets ativos
+        filterTodos.addEventListener('click', () => {
+            currentFilter = 'Todos';
+            filterTodos.classList.add('active');
+            filterAberto.classList.remove('active');
+            filterResolvido.classList.remove('active');
+            fetchAndRenderTickets(currentFilter);
+        });
+
+        filterAberto.addEventListener('click', () => {
+            currentFilter = 'Aberto';
+            filterTodos.classList.remove('active');
+            filterAberto.classList.add('active');
+            filterResolvido.classList.remove('active');
+            fetchAndRenderTickets(currentFilter);
+        });
+
+        filterResolvido.addEventListener('click', () => {
+            currentFilter = 'Resolvido';
+            filterTodos.classList.remove('active');
+            filterAberto.classList.remove('active');
+            filterResolvido.classList.add('active');
+            fetchAndRenderTickets(currentFilter);
+        });
+
+        // Event Listeners para os filtros de tickets arquivados
+        archiveYearFilter.addEventListener('change', filterArchivedTickets);
+        archiveMonthFilter.addEventListener('change', filterArchivedTickets);
+
+
+        // Função de escape para HTML
+        function htmlspecialchars(str) {
+            if (typeof str != 'string') return str;
+            return str.replace(/&/g, "&amp;")
+                      .replace(/</g, "&lt;")
+                      .replace(/>/g, "&gt;")
+                      .replace(/"/g, "&quot;")
+                      .replace(/'/g, "&#039;");
+        }
+
+        // Função para nl2br (newline to <br>)
+        function nl2br(str) {
+            return str.replace(/(?:\r\n|\r|\n)/g, '<br>');
+        }
+
+        // Event listener para o botão "Arquivar Resolvidos"
+        if (archiveAllResolvedBtn) {
+                archiveAllResolvedBtn.addEventListener('click', async () => {
+                    if (!confirm('Tem certeza que deseja ARQUIVAR TODOS os tickets com status "Resolvido"? Esta ação pode ser irreversível dependendo da sua configuração.')) {
+                        return; // Cancela se o usuário não confirmar
                     }
 
                     try {
@@ -977,21 +1304,24 @@ if (file_exists($file)) {
                         const result = await response.json();
 
                         if (result.success) {
-                            alert(result.message);
-                            renderTickets(); // Atualiza a lista de tickets ativos
+                            showMessage(result.message);
+                            fetchAndRenderTickets(currentFilter); // Atualiza a lista de tickets ativos
                             if (document.getElementById('archivedTicketsSection').style.display === 'block') {
                                 filterArchivedTickets(); // Se estiver na aba de arquivados, atualiza também
                             }
-                            // Removida a atualização do dashboard aqui
+                            populateArchiveYearFilter(); // Atualiza a lista de anos caso novos tickets tenham sido arquivados
                         } else {
-                            alert('Erro ao arquivar tickets: ' + result.message);
+                            showMessage('Erro ao arquivar tickets: ' + result.message, 'error');
                         }
                     } catch (error) {
                         console.error('Erro na requisição de arquivamento:', error);
-                        alert('Ocorreu um erro ao tentar arquivar os tickets. Verifique o console para detalhes.');
+                        showMessage('Ocorreu um erro ao tentar arquivar os tickets. Verifique o console para detalhes.', 'error');
                     }
                 });
             }
+
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', () => {
             showMainTickets(); // Mostra os tickets ativos ao carregar a página por padrão
             populateArchiveYearFilter(); // Popula os anos para o filtro de arquivados
         });
